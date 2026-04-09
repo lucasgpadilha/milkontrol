@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: milkontrol-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: milkontrol
+      POSTGRES_USER: milkontrol
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-milkontrol123}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U milkontrol"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

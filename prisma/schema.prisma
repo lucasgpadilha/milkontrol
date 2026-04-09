@@ -1,0 +1,204 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Auth ────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  USER
+}
+
+model User {
+  id            String    @id @default(cuid())
+  nome          String
+  email         String    @unique
+  senha         String
+  role          Role      @default(USER)
+  criadoEm      DateTime  @default(now())
+  atualizadoEm  DateTime  @updatedAt
+  fazendas      UsuarioFazenda[]
+}
+
+model UsuarioFazenda {
+  id         String   @id @default(cuid())
+  userId     String
+  fazendaId  String
+  papel      Role     @default(USER)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fazenda    Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, fazendaId])
+}
+
+// ─── Fazenda ─────────────────────────────────────────────────────────
+
+model Fazenda {
+  id           String    @id @default(cuid())
+  nome         String
+  endereco     String?
+  cidade       String?
+  estado       String?
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+  usuarios     UsuarioFazenda[]
+  bovinos      Bovino[]
+  tanques      Tanque[]
+}
+
+// ─── Bovinos ─────────────────────────────────────────────────────────
+
+enum Sexo {
+  MACHO
+  FEMEA
+}
+
+enum SituacaoBovino {
+  ATIVA
+  VENDIDA
+  MORTA
+}
+
+model Bovino {
+  id              String          @id @default(cuid())
+  brinco          String
+  nome            String?
+  raca            String
+  dataNascimento  DateTime
+  sexo            Sexo
+  situacao        SituacaoBovino  @default(ATIVA)
+  foto            String?
+  observacoes     String?
+  fazendaId       String
+  fazenda         Fazenda         @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  maeId           String?
+  mae             Bovino?         @relation("MaeFilho", fields: [maeId], references: [id])
+  filhos          Bovino[]        @relation("MaeFilho")
+  paiInfo         String?         // Nome do touro / código do sêmen
+  producoes       ProducaoLeite[]
+  lactacoes       Lactacao[]
+  inseminacoes    Inseminacao[]
+  registrosSanitarios RegistroSanitario[]
+  criadoEm        DateTime        @default(now())
+  atualizadoEm    DateTime        @updatedAt
+
+  @@unique([brinco, fazendaId])
+}
+
+// ─── Produção de Leite ───────────────────────────────────────────────
+
+model ProducaoLeite {
+  id          String   @id @default(cuid())
+  data        DateTime
+  quantidade  Float    // litros
+  turno       String?  // MANHA, TARDE
+  bovinoId    String
+  bovino      Bovino   @relation(fields: [bovinoId], references: [id], onDelete: Cascade)
+  criadoEm    DateTime @default(now())
+
+  @@index([bovinoId, data])
+}
+
+// ─── Lactação ────────────────────────────────────────────────────────
+
+model Lactacao {
+  id          String    @id @default(cuid())
+  inicio      DateTime
+  fim         DateTime?
+  bovinoId    String
+  bovino      Bovino    @relation(fields: [bovinoId], references: [id], onDelete: Cascade)
+  criadoEm    DateTime  @default(now())
+
+  @@index([bovinoId])
+}
+
+// ─── Reprodução ──────────────────────────────────────────────────────
+
+enum TipoInseminacao {
+  NATURAL
+  ARTIFICIAL
+}
+
+model Inseminacao {
+  id            String           @id @default(cuid())
+  data          DateTime
+  tipo          TipoInseminacao
+  responsavel   String
+  touroSemen    String?          // Identificação do touro ou sêmen
+  prenpiez      Boolean?
+  dataDiagnostico DateTime?
+  observacoes   String?
+  bovinoId      String
+  bovino        Bovino           @relation(fields: [bovinoId], references: [id], onDelete: Cascade)
+  criadoEm      DateTime         @default(now())
+
+  @@index([bovinoId])
+}
+
+// ─── Tanque de Leite ─────────────────────────────────────────────────
+
+model Tanque {
+  id              String               @id @default(cuid())
+  nome            String
+  capacidadeMax   Float                // litros
+  volumeAtual     Float                @default(0)
+  fazendaId       String
+  fazenda         Fazenda              @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  movimentacoes   MovimentacaoTanque[]
+  criadoEm        DateTime             @default(now())
+  atualizadoEm    DateTime             @updatedAt
+}
+
+enum TipoMovimentacao {
+  ENTRADA
+  SAIDA
+}
+
+enum TipoSaida {
+  VENDA
+  CONSUMO_INTERNO
+  DESCARTE
+}
+
+model MovimentacaoTanque {
+  id          String            @id @default(cuid())
+  data        DateTime
+  tipo        TipoMovimentacao
+  tipoSaida   TipoSaida?       // Apenas quando tipo = SAIDA
+  quantidade  Float             // litros
+  tanqueId    String
+  tanque      Tanque            @relation(fields: [tanqueId], references: [id], onDelete: Cascade)
+  criadoEm    DateTime          @default(now())
+
+  @@index([tanqueId, data])
+}
+
+// ─── Controle Sanitário ──────────────────────────────────────────────
+
+enum TipoRegistroSanitario {
+  VACINA
+  VERMIFUGO
+  MEDICAMENTO
+  TRATAMENTO
+}
+
+model RegistroSanitario {
+  id            String                 @id @default(cuid())
+  data          DateTime
+  tipo          TipoRegistroSanitario
+  produto       String                 // Nome do medicamento/vacina
+  dose          String?
+  responsavel   String?
+  diasCarencia  Int                    @default(0) // Dias de carência do leite
+  fimCarencia   DateTime?              // Data calculada: data + diasCarencia
+  observacoes   String?
+  bovinoId      String
+  bovino        Bovino                 @relation(fields: [bovinoId], references: [id], onDelete: Cascade)
+  criadoEm      DateTime               @default(now())
+
+  @@index([bovinoId])
+}
