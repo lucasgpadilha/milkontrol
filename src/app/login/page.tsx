@@ -54,7 +54,7 @@ export default function LoginPage() {
           <div className="mb-8 flex h-20 w-20 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm shadow-lg">
             <Milk className="h-12 w-12" />
           </div>
-          <h1 className="mb-4 text-4xl font-bold">MilkOntrol</h1>
+          <h1 className="mb-4 text-4xl font-bold">MilKontrol</h1>
           <p className="max-w-md text-center text-lg text-emerald-100/90 leading-relaxed">
             Gerencie sua fazenda leiteira com inteligência. Controle bovinos,
             produção, reprodução e muito mais em um só lugar.
@@ -85,7 +85,7 @@ export default function LoginPage() {
               <Milk className="h-7 w-7 text-white" />
             </div>
             <span className="text-2xl font-bold text-gray-900">
-              Milk<span className="text-emerald-600">Ontrol</span>
+              Milk<span className="text-emerald-600">Kontrol</span>
             </span>
           </div>
 

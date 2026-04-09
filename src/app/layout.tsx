@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "MilkOntrol — Controle de Fazenda Leiteira",
+  title: "MilKontrol — Controle de Fazenda Leiteira",
   description:
     "Sistema completo para gestão de fazenda leiteira: controle de bovinos, produção de leite, reprodução, tanque e muito mais.",
 };

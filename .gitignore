@@ -21,6 +21,7 @@ next-env.d.ts
 .claude/
 .cursor/
 .tmp/
+AGENTS.node_module
 
 # Database
 pgdata/

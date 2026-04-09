@@ -184,7 +184,7 @@ export default async function DashboardPage() {
             <Beef className="h-8 w-8 text-emerald-600" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900">
-            Bem-vindo ao MilkOntrol!
+            Bem-vindo ao MilKontrol!
           </h3>
           <p className="mt-2 text-gray-600">
             Comece cadastrando sua primeira fazenda para começar a gerenciar seu rebanho.
