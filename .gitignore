@@ -15,13 +15,11 @@ next-env.d.ts
 .env.local
 .env.*.local
 
-# AI / Agent tooling
+# AI / Agent tooling (dirs internos, não arquivos de projeto)
 .gemini/
 .antigravity/
-.claude/
 .cursor/
 .tmp/
-AGENTS.node_module
 
 # Database
 pgdata/

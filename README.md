@@ -1,36 +1,96 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🥛 MilKontrol
 
-## Getting Started
+**Sistema de Controle de Fazenda Leiteira**
 
-First, run the development server:
+Plataforma web para gestão completa de fazendas leiteiras — bovinos, produção, reprodução, tanque e controle sanitário.
+
+> 🌐 **Produção:** [https://milkontrol.cloud](https://milkontrol.cloud)
+
+---
+
+## Stack
+
+| Camada | Tecnologia |
+|--------|-----------|
+| Framework | Next.js 16 (App Router, TypeScript) |
+| Banco de Dados | PostgreSQL 16 (Docker) |
+| ORM | Prisma 7 (driver adapter) |
+| Autenticação | Auth.js v5 (credentials + JWT) |
+| UI | Tailwind CSS + shadcn/ui |
+| Validação | Zod |
+| Deploy | PM2 + Caddy (HTTPS automático) |
+
+## Módulos
+
+- **Dashboard** — KPIs em tempo real (bovinos, produção, prenhez, carência)
+- **Fazendas** — CRUD com multi-tenant por usuário
+- **Bovinos** — Cadastro, filtros (brinco, raça, sexo, situação), ficha do animal
+- **Produção de Leite** — Lançamentos diários por vaca e turno
+- **Lactação** — Controle de períodos, DEL (Dias em Lactação) automático
+- **Reprodução** — Inseminação (IA/natural), diagnóstico de prenhez inline
+- **Tanque de Leite** — Entradas/saídas, gauge visual, alerta de capacidade
+- **Controle Sanitário** — Vacinas, vermífugos, medicamentos, período de carência
+- **Relatórios** — Produção mensal, variação, ranking de produtividade, taxa de prenhez
+
+## Regras de Negócio
+
+- **RN01** — Apenas vacas podem registrar produção
+- **RN02** — Apenas vacas em lactação registram produção
+- **RN04** — Volume do tanque não pode ultrapassar a capacidade máxima
+- **RN05** — Inseminação deve ser registrada antes do diagnóstico de prenhez
+- **Carência** — Vaca medicada bloqueia registro de produção durante o período
+
+## Como rodar
 
 ```bash
+# 1. Clonar
+git clone https://github.com/lucasgpadilha/milkontrol.git
+cd milkontrol
+
+# 2. Configurar ambiente
+cp .env.example .env
+# Edite .env com suas credenciais
+
+# 3. Subir o banco de dados
+sudo docker compose up -d db
+
+# 4. Instalar dependências e configurar banco
+npm install
+npx prisma generate
+npx prisma db push
+
+# 5. Rodar em desenvolvimento
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+O app estará em `http://localhost:3005`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deploy (produção)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+pm2 start ecosystem.config.js
+pm2 save
+```
 
-## Learn More
+O Caddy cuida do HTTPS automático via Let's Encrypt.
 
-To learn more about Next.js, take a look at the following resources:
+## Estrutura
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/
+├── app/
+│   ├── (dashboard)/     # Páginas protegidas (bovinos, produção, etc.)
+│   ├── api/             # API routes (11 endpoints)
+│   ├── login/           # Autenticação
+│   └── registro/        # Cadastro de usuário
+├── components/          # Sidebar, UI components (shadcn)
+├── lib/                 # Auth, Prisma, utils, validators
+└── middleware.ts        # Proteção de rotas
+prisma/
+└── schema.prisma        # 10 models, 8 enums
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Licença
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Projeto privado — © Lucas Padilha
