@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
+  HelpCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -32,6 +33,7 @@ const navItems = [
   { href: "/tanque", label: "Tanque", icon: FlaskConical },
   { href: "/sanitario", label: "Sanitário", icon: Syringe },
   { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
+  { href: "/ajuda", label: "Ajuda", icon: HelpCircle },
 ];
 
 export function Sidebar() {

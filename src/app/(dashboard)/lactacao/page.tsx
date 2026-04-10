@@ -5,6 +5,7 @@ import { Plus, FlaskConical, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Hint } from "@/components/hint";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatDate, calcularDEL } from "@/lib/utils";
@@ -67,10 +68,16 @@ export default function LactacaoPage() {
           <Button variant={filtroAtivas ? "default" : "outline"} size="sm" onClick={() => setFiltroAtivas(true)}>Ativas</Button>
           <Button variant={!filtroAtivas ? "default" : "outline"} size="sm" onClick={() => setFiltroAtivas(false)}>Todas</Button>
           <Button onClick={() => setShowForm(!showForm)} id="add-lactacao-btn">
+
             <Plus className="h-4 w-4" /> Iniciar Lactação
           </Button>
         </div>
       </div>
+
+      <Hint id="lactacao-intro" title="Controle de lactação">
+        Inicie uma lactação quando a vaca parir. O sistema calcula automaticamente os <strong>DEL (Dias em Lactação)</strong>.
+        Ao iniciar uma nova lactação, a anterior é encerrada automaticamente. Vacas sem lactação ativa são consideradas &quot;secas&quot;.
+      </Hint>
 
       {showForm && (
         <Card className="animate-fade-in border-emerald-200">

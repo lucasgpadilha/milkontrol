@@ -5,6 +5,7 @@ import { Plus, FlaskConical, Loader2, AlertTriangle, ArrowUpCircle, ArrowDownCir
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Hint } from "@/components/hint";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatDate, formatNumber } from "@/lib/utils";
@@ -95,6 +96,12 @@ export default function TanquePage() {
           )}
         </div>
       </div>
+
+      <Hint id="tanque-intro" title="Gestão do tanque de leite">
+        Cadastre seus tanques e registre entradas (coleta) e saídas (venda, consumo, descarte).
+        O sistema atualiza o volume automaticamente e <strong>alerta quando o tanque atinge 90% da capacidade</strong>.
+        O volume nunca pode ultrapassar a capacidade máxima.
+      </Hint>
 
       {showTanqueForm && (
         <Card className="animate-fade-in border-emerald-200">

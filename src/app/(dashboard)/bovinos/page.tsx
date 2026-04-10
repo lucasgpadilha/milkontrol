@@ -13,6 +13,7 @@ import {
   Milk,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Hint } from "@/components/hint";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -200,6 +201,12 @@ export default function BovinosPage() {
           Novo Bovino
         </Button>
       </div>
+
+      <Hint id="bovinos-intro" title="Gerencie seu rebanho">
+        Cadastre cada animal com brinco, raça e data de nascimento. Use os filtros para encontrar animais rapidamente.
+        A coluna <strong>Lactação</strong> mostra os DEL (Dias em Lactação) das vacas que estão produzindo.
+        Para registrar um bezerro, cadastre-o aqui e selecione a mãe no campo correspondente.
+      </Hint>
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">

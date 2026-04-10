@@ -9,6 +9,7 @@ import {
   TrendingUp,
   AlertTriangle,
 } from "lucide-react";
+import { DashboardHints } from "@/components/dashboard-hints";
 
 async function getStats(userId: string) {
   // Get user's farms
@@ -150,6 +151,8 @@ export default async function DashboardPage() {
           Visão geral da sua produção leiteira
         </p>
       </div>
+
+      <DashboardHints />
 
       {/* Stat cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

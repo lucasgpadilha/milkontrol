@@ -11,6 +11,7 @@ import {
   Warehouse,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Hint } from "@/components/hint";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -123,6 +124,11 @@ export default function FazendasPage() {
           Nova Fazenda
         </Button>
       </div>
+
+      <Hint id="fazendas-intro" title="Primeiro passo: cadastre sua fazenda">
+        A fazenda é a base do sistema. Cada fazenda agrupa seus bovinos, tanques e registros.
+        Você pode gerenciar múltiplas fazendas com a mesma conta.
+      </Hint>
 
       {/* Form */}
       {showForm && (

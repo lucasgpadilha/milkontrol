@@ -5,6 +5,7 @@ import { Plus, Heart, Loader2, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Hint } from "@/components/hint";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
@@ -85,6 +86,12 @@ export default function ReproducaoPage() {
           <Plus className="h-4 w-4" /> Nova Inseminação
         </Button>
       </div>
+
+      <Hint id="reproducao-intro" title="Controle reprodutivo">
+        Registre cada inseminação (artificial ou natural) com data, responsável e sêmen/touro.
+        Após o período de espera, use os botões <strong>✓</strong> e <strong>✗</strong> para registrar o diagnóstico de prenhez.
+        A taxa de prenhez é calculada automaticamente nos Relatórios.
+      </Hint>
 
       {showForm && (
         <Card className="animate-fade-in border-emerald-200">

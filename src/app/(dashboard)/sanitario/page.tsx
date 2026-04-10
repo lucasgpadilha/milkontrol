@@ -5,6 +5,7 @@ import { Plus, Syringe, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Hint } from "@/components/hint";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatDate, estaEmCarencia } from "@/lib/utils";
@@ -101,6 +102,12 @@ export default function SanitarioPage() {
           </Button>
         </div>
       </div>
+
+      <Hint id="sanitario-intro" title="Controle sanitário e carência">
+        Registre vacinas, vermífugos e medicamentos aplicados. Informe os <strong>dias de carência</strong> quando aplicável.
+        Durante o período de carência, o sistema <strong>bloqueia automaticamente</strong> o registro de produção de leite daquele animal,
+        garantindo que leite contaminado não entre no tanque.
+      </Hint>
 
       {showForm && (
         <Card className="animate-fade-in border-emerald-200">

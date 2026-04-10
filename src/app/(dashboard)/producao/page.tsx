@@ -5,6 +5,7 @@ import { Plus, Milk, Loader2, Calendar, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Hint } from "@/components/hint";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatDate, formatNumber } from "@/lib/utils";
 
@@ -103,6 +104,11 @@ export default function ProducaoPage() {
           Novo Lançamento
         </Button>
       </div>
+
+      <Hint id="producao-intro" title="Lançamento diário de leite">
+        Registre a produção de cada vaca por turno (manhã/tarde). Apenas vacas <strong>em lactação</strong> aparecem na lista.
+        Se uma vaca estiver em <strong>período de carência</strong> (medicada), o sistema bloqueará o lançamento automaticamente.
+      </Hint>
 
       {showForm && (
         <Card className="animate-fade-in border-emerald-200">

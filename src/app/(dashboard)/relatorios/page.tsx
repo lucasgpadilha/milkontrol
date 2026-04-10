@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { BarChart3, TrendingUp, Milk, Beef } from "lucide-react";
 import { formatNumber } from "@/lib/utils";
+import { RelatoriosHints } from "@/components/relatorios-hints";
 
 async function getReportData(userId: string) {
   const userFazendas = await prisma.usuarioFazenda.findMany({
@@ -108,6 +109,8 @@ export default async function RelatoriosPage() {
         <h1 className="text-2xl font-bold text-gray-900">Relatórios</h1>
         <p className="mt-1 text-gray-500">Visão consolidada da produção</p>
       </div>
+
+      <RelatoriosHints />
 
       {/* Summary cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
