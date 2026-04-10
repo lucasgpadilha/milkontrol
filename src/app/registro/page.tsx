@@ -85,7 +85,7 @@ export default function RegistroPage() {
               <Milk className="h-7 w-7 text-white" />
             </div>
             <span className="text-2xl font-bold text-gray-900">
-              Milk<span className="text-emerald-600">Kontrol</span>
+              Mil<span className="text-emerald-600">Kontrol</span>
             </span>
           </div>
 

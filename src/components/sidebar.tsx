@@ -78,7 +78,7 @@ export function Sidebar() {
               </div>
               <div>
                 <span className="text-lg font-bold text-gray-900">
-                  Milk
+                  Mil
                   <span className="text-emerald-600">Kontrol</span>
                 </span>
               </div>
