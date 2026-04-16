@@ -7,6 +7,7 @@ export const fazendaSchema = z.object({
   endereco: z.string().optional(),
   cidade: z.string().optional(),
   estado: z.string().optional(),
+  ordenhasDia: z.number().int().min(2).max(3).default(2),
 });
 
 export type FazendaInput = z.infer<typeof fazendaSchema>;
@@ -23,6 +24,7 @@ export const bovinoSchema = z.object({
   maeId: z.string().optional(),
   paiInfo: z.string().optional(),
   observacoes: z.string().optional(),
+  piqueteId: z.string().optional(),
 });
 
 export type BovinoInput = z.infer<typeof bovinoSchema>;
@@ -32,7 +34,7 @@ export type BovinoInput = z.infer<typeof bovinoSchema>;
 export const producaoSchema = z.object({
   data: z.string().min(1, "Data é obrigatória"),
   quantidade: z.number().positive("Quantidade deve ser positiva"),
-  turno: z.string().optional(),
+  turno: z.enum(["MANHA", "TARDE", "NOITE"]).optional(),
   bovinoId: z.string().min(1, "Bovino é obrigatório"),
 });
 
@@ -57,9 +59,37 @@ export const inseminacaoSchema = z.object({
   touroSemen: z.string().optional(),
   observacoes: z.string().optional(),
   bovinoId: z.string().min(1, "Bovino é obrigatório"),
+  veterinarioId: z.string().optional(),
+  bancoSemenId: z.string().optional(),
 });
 
 export type InseminacaoInput = z.infer<typeof inseminacaoSchema>;
+
+// ─── Banco de Sêmen ──────────────────────────────────────────────────
+
+export const bancoSemenSchema = z.object({
+  codigo: z.string().min(1, "Código ou Identificação é obrigatória"),
+  nomeTouro: z.string().min(1, "Nome do touro é obrigatório"),
+  raca: z.string().optional(),
+  fornecedor: z.string().optional(),
+  origem: z.string().optional(),
+  quantidade: z.number().int().min(0).default(0),
+});
+
+export type BancoSemenInput = z.infer<typeof bancoSemenSchema>;
+
+// ─── Veterinário ──────────────────────────────────────────────────────
+
+export const veterinarioSchema = z.object({
+  nome: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
+  crmv: z.string().optional(),
+  especialidade: z.string().optional(),
+  telefone: z.string().optional(),
+  email: z.string().email("Email inválido").optional().or(z.literal("")),
+  ativo: z.boolean().default(true),
+});
+
+export type VeterinarioInput = z.infer<typeof veterinarioSchema>;
 
 // ─── Tanque ──────────────────────────────────────────────────────────
 
@@ -76,6 +106,8 @@ export const movimentacaoTanqueSchema = z.object({
   tipoSaida: z.enum(["VENDA", "CONSUMO_INTERNO", "DESCARTE"]).optional(),
   quantidade: z.number().positive("Quantidade deve ser positiva"),
   tanqueId: z.string().min(1, "Tanque é obrigatório"),
+  comprador: z.string().optional(),
+  precoLitro: z.number().min(0).optional(),
 });
 
 export type MovimentacaoTanqueInput = z.infer<typeof movimentacaoTanqueSchema>;
@@ -91,9 +123,35 @@ export const registroSanitarioSchema = z.object({
   diasCarencia: z.number().int().min(0).default(0),
   observacoes: z.string().optional(),
   bovinoId: z.string().min(1, "Bovino é obrigatório"),
+  veterinarioId: z.string().optional(),
 });
 
 export type RegistroSanitarioInput = z.infer<typeof registroSanitarioSchema>;
+
+// ─── Alimentação ─────────────────────────────────────────────────────
+
+export const registroAlimentacaoSchema = z.object({
+  data: z.string().min(1, "Data é obrigatória"),
+  tipoAlimento: z.enum(["SILAGEM", "RACAO", "FENO", "SAL_MINERAL", "CONCENTRADO", "PASTO", "OUTRO"]),
+  descricao: z.string().optional(),
+  quantidadeKg: z.number().positive("Quantidade deve ser positiva"),
+  custoUnitario: z.number().min(0).optional(),
+  piqueteId: z.string().min(1, "Piquete é obrigatório"),
+  observacoes: z.string().optional(),
+});
+
+export type RegistroAlimentacaoInput = z.infer<typeof registroAlimentacaoSchema>;
+
+// ─── Pesagem ─────────────────────────────────────────────────────────
+
+export const pesagemSchema = z.object({
+  data: z.string().min(1, "Data é obrigatória"),
+  pesoKg: z.number().positive("Peso deve ser positivo"),
+  bovinoId: z.string().min(1, "Bovino é obrigatório"),
+  observacoes: z.string().optional(),
+});
+
+export type PesagemInput = z.infer<typeof pesagemSchema>;
 
 // ─── Auth ────────────────────────────────────────────────────────────
 

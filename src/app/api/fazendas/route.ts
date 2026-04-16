@@ -10,15 +10,24 @@ export async function GET() {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
-  const fazendas = await prisma.fazenda.findMany({
+  const fazendasRaw = await prisma.fazenda.findMany({
     where: {
       usuarios: { some: { userId: session.user.id } },
     },
     include: {
       _count: { select: { bovinos: true } },
+      usuarios: {
+        where: { userId: session.user.id },
+        select: { papel: true }
+      }
     },
     orderBy: { criadoEm: "desc" },
   });
+
+  const fazendas = fazendasRaw.map(f => ({
+    ...f,
+    papel: f.usuarios[0]?.papel || "OPERADOR"
+  }));
 
   return NextResponse.json(fazendas);
 }
@@ -46,7 +55,7 @@ export async function POST(req: NextRequest) {
       usuarios: {
         create: {
           userId: session.user.id,
-          papel: "ADMIN",
+          papel: "PROPRIETARIO",
         },
       },
     },

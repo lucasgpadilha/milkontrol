@@ -83,7 +83,7 @@ export async function DELETE(
   const { id } = await params;
 
   const membership = await prisma.usuarioFazenda.findFirst({
-    where: { userId: session.user.id, fazendaId: id, papel: "ADMIN" },
+    where: { userId: session.user.id, fazendaId: id, papel: "PROPRIETARIO" },
   });
   if (!membership) {
     return NextResponse.json({ error: "Apenas administradores podem excluir" }, { status: 403 });

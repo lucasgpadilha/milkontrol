@@ -2,18 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { tanqueSchema, movimentacaoTanqueSchema } from "@/lib/validators";
+import { getFazendaAtivaIds } from "@/lib/fazenda-ativa";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-
-  const userFazendas = await prisma.usuarioFazenda.findMany({
-    where: { userId: session.user.id }, select: { fazendaId: true },
-  });
-  const fazendaIds = userFazendas.map((uf) => uf.fazendaId);
+  const ctx = await getFazendaAtivaIds();
+  if (!ctx) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
 
   const tanques = await prisma.tanque.findMany({
-    where: { fazendaId: { in: fazendaIds } },
+    where: { fazendaId: { in: ctx.fazendaIds } },
     include: {
       fazenda: { select: { nome: true } },
       movimentacoes: { orderBy: { data: "desc" }, take: 10 },

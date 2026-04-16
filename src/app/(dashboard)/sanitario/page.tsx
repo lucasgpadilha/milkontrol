@@ -21,6 +21,7 @@ interface RegistroSanitario {
   fimCarencia: string | null;
   observacoes: string | null;
   bovino: { brinco: string; nome: string | null };
+  veterinario?: { nome: string } | null;
 }
 
 interface Bovino { id: string; brinco: string; nome: string | null; }
@@ -35,6 +36,7 @@ const tipoLabels: Record<string, string> = {
 export default function SanitarioPage() {
   const [registros, setRegistros] = useState<RegistroSanitario[]>([]);
   const [bovinos, setBovinos] = useState<Bovino[]>([]);
+  const [veterinarios, setVeterinarios] = useState<{id: string, nome: string, ativo: boolean}[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -48,16 +50,20 @@ export default function SanitarioPage() {
     diasCarencia: "0",
     observacoes: "",
     bovinoId: "",
+    veterinarioId: "",
   });
 
   const fetchData = async () => {
     const params = filtroCarencia ? "?emCarencia=true" : "";
-    const [regRes, bovRes] = await Promise.all([
+    const [regRes, bovRes, vetRes] = await Promise.all([
       fetch(`/api/sanitario${params}`),
       fetch("/api/bovinos"),
+      fetch("/api/veterinarios"),
     ]);
     setRegistros(await regRes.json());
     setBovinos(await bovRes.json());
+    const vets = await vetRes.json();
+    setVeterinarios(vets.filter((v: any) => v.ativo));
     setLoading(false);
   };
 
@@ -135,7 +141,22 @@ export default function SanitarioPage() {
                 <div className="space-y-2"><Label>Produto *</Label><Input value={form.produto} onChange={(e) => setForm({ ...form, produto: e.target.value })} placeholder="Nome do medicamento/vacina" required /></div>
                 <div className="space-y-2"><Label>Dose</Label><Input value={form.dose} onChange={(e) => setForm({ ...form, dose: e.target.value })} placeholder="Ex: 5ml" /></div>
                 <div className="space-y-2"><Label>Dias de Carência</Label><Input type="number" min="0" value={form.diasCarencia} onChange={(e) => setForm({ ...form, diasCarencia: e.target.value })} /></div>
-                <div className="space-y-2"><Label>Responsável</Label><Input value={form.responsavel} onChange={(e) => setForm({ ...form, responsavel: e.target.value })} /></div>
+                <div className="space-y-2">
+                  <Label>Veterinário Cadastrado</Label>
+                  <select 
+                    value={form.veterinarioId} 
+                    onChange={(e) => {
+                      const vId = e.target.value;
+                      const vNome = veterinarios.find(v => v.id === vId)?.nome || "";
+                      setForm({ ...form, veterinarioId: vId, responsavel: vNome || form.responsavel });
+                    }} 
+                    className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  >
+                    <option value="">(Nenhum / Não aplicável)</option>
+                    {veterinarios.map(v => <option key={v.id} value={v.id}>{v.nome}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2"><Label>Responsável (texto livre)</Label><Input value={form.responsavel} onChange={(e) => setForm({ ...form, responsavel: e.target.value })} /></div>
                 <div className="space-y-2"><Label>Observações</Label><Input value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} /></div>
               </div>
               <div className="flex gap-2">
@@ -169,7 +190,13 @@ export default function SanitarioPage() {
                     )
                   ) : "—"}
                 </td>
-                <td>{r.responsavel || "—"}</td>
+                <td>
+                   {r.veterinario ? (
+                     <span className="font-medium text-emerald-700">{r.veterinario.nome}</span>
+                   ) : (
+                     r.responsavel || "—"
+                   )}
+                </td>
               </tr>
             ))}
           </tbody>

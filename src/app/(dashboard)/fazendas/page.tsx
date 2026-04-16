@@ -9,6 +9,8 @@ import {
   Trash2,
   Loader2,
   Warehouse,
+  Milk,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/hint";
@@ -21,6 +23,8 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useFazendaAtiva } from "@/components/fazenda-context";
 
 interface Fazenda {
   id: string;
@@ -28,6 +32,7 @@ interface Fazenda {
   endereco?: string;
   cidade?: string;
   estado?: string;
+  ordenhasDia: number;
   _count: { bovinos: number };
 }
 
@@ -37,11 +42,13 @@ export default function FazendasPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const { fazendaAtiva, selecionarFazenda } = useFazendaAtiva();
   const [form, setForm] = useState({
     nome: "",
     endereco: "",
     cidade: "",
     estado: "",
+    ordenhasDia: 2,
   });
 
   const fetchFazendas = async () => {
@@ -56,7 +63,7 @@ export default function FazendasPage() {
   }, []);
 
   const resetForm = () => {
-    setForm({ nome: "", endereco: "", cidade: "", estado: "" });
+    setForm({ nome: "", endereco: "", cidade: "", estado: "", ordenhasDia: 2 });
     setEditingId(null);
     setShowForm(false);
   };
@@ -85,6 +92,7 @@ export default function FazendasPage() {
       endereco: fazenda.endereco || "",
       cidade: fazenda.cidade || "",
       estado: fazenda.estado || "",
+      ordenhasDia: fazenda.ordenhasDia || 2,
     });
     setEditingId(fazenda.id);
     setShowForm(true);
@@ -94,6 +102,10 @@ export default function FazendasPage() {
     if (!confirm("Tem certeza que deseja excluir esta fazenda? Todos os dados serão perdidos.")) return;
     await fetch(`/api/fazendas/${id}`, { method: "DELETE" });
     fetchFazendas();
+  };
+
+  const handleSelecionar = async (fazendaId: string) => {
+    await selecionarFazenda(fazendaId);
   };
 
   if (loading) {
@@ -127,7 +139,8 @@ export default function FazendasPage() {
 
       <Hint id="fazendas-intro" title="Primeiro passo: cadastre sua fazenda">
         A fazenda é a base do sistema. Cada fazenda agrupa seus bovinos, tanques e registros.
-        Você pode gerenciar múltiplas fazendas com a mesma conta.
+        Você pode gerenciar múltiplas fazendas com a mesma conta. Use o seletor na sidebar
+        para trocar entre fazendas rapidamente.
       </Hint>
 
       {/* Form */}
@@ -143,7 +156,7 @@ export default function FazendasPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="nome">Nome *</Label>
                   <Input
@@ -191,6 +204,19 @@ export default function FazendasPage() {
                     maxLength={2}
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label>Ordenhas por Dia</Label>
+                  <select
+                    value={form.ordenhasDia}
+                    onChange={(e) =>
+                      setForm({ ...form, ordenhasDia: parseInt(e.target.value) })
+                    }
+                    className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  >
+                    <option value={2}>2 ordenhas (Manhã + Tarde)</option>
+                    <option value={3}>3 ordenhas (Manhã + Tarde + Noite)</option>
+                  </select>
+                </div>
               </div>
               <div className="flex gap-2">
                 <Button type="submit" disabled={saving}>
@@ -228,56 +254,83 @@ export default function FazendasPage() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {fazendas.map((fazenda, i) => (
-            <Card
-              key={fazenda.id}
-              className="animate-fade-in group"
-              style={{ animationDelay: `${i * 80}ms` }}
-            >
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100">
-                      <Warehouse className="h-5 w-5 text-emerald-600" />
+          {fazendas.map((fazenda, i) => {
+            const isAtiva = fazendaAtiva?.id === fazenda.id;
+            return (
+              <Card
+                key={fazenda.id}
+                className={`animate-fade-in group cursor-pointer transition-all ${
+                  isAtiva
+                    ? "border-emerald-300 ring-2 ring-emerald-500/20 shadow-md"
+                    : "hover:border-emerald-200 hover:shadow-sm"
+                }`}
+                style={{ animationDelay: `${i * 80}ms` }}
+                onClick={() => handleSelecionar(fazenda.id)}
+              >
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                          isAtiva ? "bg-emerald-500" : "bg-emerald-100"
+                        }`}
+                      >
+                        {isAtiva ? (
+                          <Check className="h-5 w-5 text-white" />
+                        ) : (
+                          <Warehouse className="h-5 w-5 text-emerald-600" />
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">
+                          {fazenda.nome}
+                        </h3>
+                        {(fazenda.cidade || fazenda.estado) && (
+                          <p className="flex items-center gap-1 text-xs text-gray-500">
+                            <MapPin className="h-3 w-3" />
+                            {[fazenda.cidade, fazenda.estado]
+                              .filter(Boolean)
+                              .join(" — ")}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">
-                        {fazenda.nome}
-                      </h3>
-                      {(fazenda.cidade || fazenda.estado) && (
-                        <p className="flex items-center gap-1 text-xs text-gray-500">
-                          <MapPin className="h-3 w-3" />
-                          {[fazenda.cidade, fazenda.estado]
-                            .filter(Boolean)
-                            .join(" — ")}
-                        </p>
-                      )}
+                    <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleEdit(fazenda); }}
+                        className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                        title="Editar"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDelete(fazenda.id); }}
+                        className="rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                        title="Excluir"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                    <button
-                      onClick={() => handleEdit(fazenda)}
-                      className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                      title="Editar"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(fazenda.id)}
-                      className="rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
-                      title="Excluir"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                  <div className="mt-4 flex items-center gap-4 text-sm text-gray-500">
+                    <span className="flex items-center gap-1.5">
+                      <Beef className="h-4 w-4" />
+                      {fazenda._count.bovinos} bovino{fazenda._count.bovinos !== 1 ? "s" : ""}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Milk className="h-4 w-4" />
+                      {fazenda.ordenhasDia}x ordenha/dia
+                    </span>
                   </div>
-                </div>
-                <div className="mt-4 flex items-center gap-2 text-sm text-gray-500">
-                  <Beef className="h-4 w-4" />
-                  <span>{fazenda._count.bovinos} bovinos</span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  {isAtiva && (
+                    <Badge variant="success" className="mt-3">
+                      ✓ Fazenda Ativa
+                    </Badge>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

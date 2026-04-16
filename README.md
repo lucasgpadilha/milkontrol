@@ -75,6 +75,19 @@ pm2 save
 
 O Caddy cuida do HTTPS automático via Let's Encrypt.
 
+## Gerador de Dados para Demonstração (Mockups)
+
+O projeto conta com um script automatizado que popula o banco de dados com dados consistentes de propriedades leiteiras de portes pequeno, médio e grande (incluindo bovinos, produção retroativa, carência sanitária, estoque de leite, faturamento, histórico de reprodução e mais). 
+
+Pode ser usado para exibir dashboards reais durante demonstrações do SaaS.
+
+```bash
+# Rodar o gerador executando o seed em tsx
+npm run build # (Opcional) garante que as tipagens estejam geradas
+export $(grep -v '^#' .env | xargs) && npx tsx scripts/mockup.ts
+```
+**Disclaimer**: Executar essa ação na conta vai limpar registros de fazenda pré-existentes de mesmo nome e recriar.
+
 ## Estrutura
 
 ```

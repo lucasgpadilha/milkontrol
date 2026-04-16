@@ -2,29 +2,28 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { registroSanitarioSchema } from "@/lib/validators";
+import { getFazendaAtivaIds } from "@/lib/fazenda-ativa";
 
 export async function GET(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  const ctx = await getFazendaAtivaIds();
+  if (!ctx) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const bovinoId = searchParams.get("bovinoId");
   const emCarencia = searchParams.get("emCarencia");
 
-  const userFazendas = await prisma.usuarioFazenda.findMany({
-    where: { userId: session.user.id }, select: { fazendaId: true },
-  });
-  const fazendaIds = userFazendas.map((uf) => uf.fazendaId);
-
   const where: Record<string, unknown> = {
-    bovino: { fazendaId: { in: fazendaIds } },
+    bovino: { fazendaId: { in: ctx.fazendaIds } },
   };
   if (bovinoId) where.bovinoId = bovinoId;
   if (emCarencia === "true") where.fimCarencia = { gte: new Date() };
 
   const registros = await prisma.registroSanitario.findMany({
     where,
-    include: { bovino: { select: { brinco: true, nome: true } } },
+    include: { 
+      bovino: { select: { brinco: true, nome: true } },
+      veterinario: { select: { nome: true } }
+    },
     orderBy: { data: "desc" },
   });
 

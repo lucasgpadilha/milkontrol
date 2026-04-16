@@ -140,10 +140,7 @@ export default function AjudaPage() {
               O objetivo é substituir planilhas e cadernos por uma ferramenta digital, acessível de qualquer dispositivo, que centraliza todas as informações do rebanho,
               produção, reprodução e controle sanitário em um só lugar.
             </p>
-            <p className="mt-2 text-sm leading-relaxed text-gray-700">
-              O sistema foi desenvolvido como projeto acadêmico de Trabalho de Conclusão de Curso e implementa regras de negócio reais do setor leiteiro,
-              incluindo controle de carência de medicamentos, rastreamento de inseminações e cálculo automatizado de indicadores de produtividade.
-            </p>
+
           </div>
         </div>
       </div>
@@ -240,10 +237,7 @@ export default function AjudaPage() {
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="text-center text-sm text-gray-400 pb-4">
-        MilKontrol — Desenvolvido por Lucas Padilha
-      </div>
+
     </div>
   );
 }

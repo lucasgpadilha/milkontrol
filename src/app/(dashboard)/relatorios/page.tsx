@@ -1,16 +1,26 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { BarChart3, TrendingUp, Milk, Beef } from "lucide-react";
 import { formatNumber } from "@/lib/utils";
 import { RelatoriosHints } from "@/components/relatorios-hints";
 
 async function getReportData(userId: string) {
+  // Ler fazenda ativa do cookie
+  const cookieStore = await cookies();
+  const fazendaAtivaCookie = cookieStore.get("fazenda-ativa")?.value;
+
   const userFazendas = await prisma.usuarioFazenda.findMany({
     where: { userId }, select: { fazendaId: true },
   });
-  const fazendaIds = userFazendas.map((uf) => uf.fazendaId);
+  let fazendaIds = userFazendas.map((uf) => uf.fazendaId);
   if (fazendaIds.length === 0) return null;
+
+  // Filtrar pela fazenda ativa se selecionada
+  if (fazendaAtivaCookie && fazendaAtivaCookie !== "todas" && fazendaIds.includes(fazendaAtivaCookie)) {
+    fazendaIds = [fazendaAtivaCookie];
+  }
 
   const now = new Date();
   const mesAtual = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -47,7 +57,7 @@ async function getReportData(userId: string) {
     prisma.bovino.count({ where: { fazendaId: { in: fazendaIds }, situacao: "ATIVA" } }),
     prisma.bovino.count({ where: { fazendaId: { in: fazendaIds }, situacao: "ATIVA", sexo: "FEMEA" } }),
     prisma.inseminacao.groupBy({
-      by: ["prenpiez"],
+      by: ["prenhez"],
       where: { bovino: { fazendaId: { in: fazendaIds } } },
       _count: true,
     }),
@@ -70,7 +80,7 @@ async function getReportData(userId: string) {
   });
 
   const totalInseminacoes = taxaPrenhez.reduce((acc, t) => acc + t._count, 0);
-  const prenhes = taxaPrenhez.find((t) => t.prenpiez === true)?._count || 0;
+  const prenhes = taxaPrenhez.find((t) => t.prenhez === true)?._count || 0;
 
   return {
     producaoMesAtual: producaoMesAtual._sum.quantidade || 0,

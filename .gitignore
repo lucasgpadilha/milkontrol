@@ -16,6 +16,7 @@ next-env.d.ts
 .env.*.local
 
 # AI / Agent tooling
+.agent/
 .gemini/
 .antigravity/
 .cursor/

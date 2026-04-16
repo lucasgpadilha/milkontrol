@@ -1,25 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { producaoSchema } from "@/lib/validators";
+import { getFazendaAtivaIds } from "@/lib/fazenda-ativa";
+import { assertRole } from "@/lib/rbac";
 
 export async function GET(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  const ctx = await getFazendaAtivaIds();
+  if (!ctx) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const bovinoId = searchParams.get("bovinoId");
-  const fazendaId = searchParams.get("fazendaId");
   const dataInicio = searchParams.get("dataInicio");
   const dataFim = searchParams.get("dataFim");
 
-  const userFazendas = await prisma.usuarioFazenda.findMany({
-    where: { userId: session.user.id }, select: { fazendaId: true },
-  });
-  const fazendaIds = userFazendas.map((uf) => uf.fazendaId);
-
   const where: Record<string, unknown> = {
-    bovino: { fazendaId: fazendaId ? fazendaId : { in: fazendaIds } },
+    bovino: { fazendaId: { in: ctx.fazendaIds } },
   };
   if (bovinoId) where.bovinoId = bovinoId;
   if (dataInicio || dataFim) {
@@ -39,8 +34,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  // RBAC: Somente PROPRIETARIO, GERENTE e OPERADOR podem lançar produção
+  const roleCheck = await assertRole(["PROPRIETARIO", "GERENTE", "OPERADOR"]);
+  if (!roleCheck) return NextResponse.json({ error: "Sem permissão para esta operação" }, { status: 403 });
+
+  const ctx = await getFazendaAtivaIds();
+  if (!ctx) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
 
   const body = await req.json();
   const validation = producaoSchema.safeParse(body);
@@ -49,8 +48,10 @@ export async function POST(req: NextRequest) {
   }
 
   // Validate: only lactating cows can register production (RN01, RN02)
+  // + Ownership: bovino deve pertencer à fazenda do usuário
+  // + Soft-delete: bovino não pode estar arquivado
   const bovino = await prisma.bovino.findFirst({
-    where: { id: validation.data.bovinoId },
+    where: { id: validation.data.bovinoId, fazendaId: { in: ctx.fazendaIds }, deletedAt: null },
     include: { lactacoes: { where: { fim: null }, take: 1 } },
   });
 

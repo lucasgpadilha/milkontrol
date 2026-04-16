@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { bovinoSchema } from "@/lib/validators";
+import { getFazendaAtivaIds } from "@/lib/fazenda-ativa";
 
 export async function GET(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  }
+  const ctx = await getFazendaAtivaIds();
+  if (!ctx) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const fazendaId = searchParams.get("fazendaId");
@@ -15,15 +14,9 @@ export async function GET(req: NextRequest) {
   const situacao = searchParams.get("situacao");
   const busca = searchParams.get("busca");
 
-  // Get user's farms
-  const userFazendas = await prisma.usuarioFazenda.findMany({
-    where: { userId: session.user.id },
-    select: { fazendaId: true },
-  });
-  const fazendaIds = userFazendas.map((uf) => uf.fazendaId);
-
   const where: Record<string, unknown> = {
-    fazendaId: fazendaId ? { in: [fazendaId] } : { in: fazendaIds },
+    fazendaId: fazendaId ? { in: [fazendaId] } : { in: ctx.fazendaIds },
+    deletedAt: null,
   };
 
   if (sexo) where.sexo = sexo;
@@ -40,6 +33,7 @@ export async function GET(req: NextRequest) {
     where,
     include: {
       fazenda: { select: { nome: true } },
+      piquete: { select: { id: true, nome: true } },
       mae: { select: { id: true, brinco: true, nome: true } },
       lactacoes: {
         where: { fim: null },
@@ -62,10 +56,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
-  const body = await req.json();
-  const { fazendaId, ...rest } = body;
+  const ctx = await getFazendaAtivaIds();
+  if (!ctx || ctx.todas || !ctx.fazendaAtiva) {
+    return NextResponse.json({ error: "Selecione uma fazenda ativa para cadastrar bovinos" }, { status: 400 });
+  }
 
-  const validation = bovinoSchema.safeParse(rest);
+  const body = await req.json();
+  
+  const validation = bovinoSchema.safeParse(body);
   if (!validation.success) {
     return NextResponse.json(
       { error: validation.error.issues[0].message },
@@ -73,19 +71,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Verify farm ownership
-  const membership = await prisma.usuarioFazenda.findFirst({
-    where: { userId: session.user.id, fazendaId },
-  });
-  if (!membership) {
-    return NextResponse.json({ error: "Fazenda não encontrada" }, { status: 403 });
-  }
-
   const bovino = await prisma.bovino.create({
     data: {
       ...validation.data,
       dataNascimento: new Date(validation.data.dataNascimento),
-      fazendaId,
+      fazendaId: ctx.fazendaAtiva.id,
     },
   });
 

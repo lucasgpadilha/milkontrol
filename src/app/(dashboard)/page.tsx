@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import {
   Beef,
   Milk,
@@ -11,15 +12,7 @@ import {
 } from "lucide-react";
 import { DashboardHints } from "@/components/dashboard-hints";
 
-async function getStats(userId: string) {
-  // Get user's farms
-  const userFazendas = await prisma.usuarioFazenda.findMany({
-    where: { userId },
-    select: { fazendaId: true },
-  });
-
-  const fazendaIds = userFazendas.map((uf) => uf.fazendaId);
-
+async function getStats(userId: string, fazendaIds: string[]) {
   if (fazendaIds.length === 0) {
     return {
       totalFazendas: 0,
@@ -30,20 +23,21 @@ async function getStats(userId: string) {
       producaoMes: 0,
       inseminacoesAbertas: 0,
       alertasCarencia: 0,
+      vacasParaSecar: 0,
     };
   }
 
-  const [totalBovinos, totalVacas, vacasLactacao, producaoHoje, producaoMes, inseminacoesAbertas, alertasCarencia] =
+  const [totalBovinos, totalVacas, vacasLactacao, producaoHoje, producaoMes, inseminacoesAbertas, alertasCarencia, vacasParaSecar] =
     await Promise.all([
       prisma.bovino.count({
-        where: { fazendaId: { in: fazendaIds }, situacao: "ATIVA" },
+        where: { fazendaId: { in: fazendaIds }, situacao: "ATIVA", deletedAt: null },
       }),
       prisma.bovino.count({
-        where: { fazendaId: { in: fazendaIds }, situacao: "ATIVA", sexo: "FEMEA" },
+        where: { fazendaId: { in: fazendaIds }, situacao: "ATIVA", sexo: "FEMEA", deletedAt: null },
       }),
       prisma.lactacao.count({
         where: {
-          bovino: { fazendaId: { in: fazendaIds } },
+          bovino: { fazendaId: { in: fazendaIds }, deletedAt: null },
           fim: null,
         },
       }),
@@ -68,13 +62,20 @@ async function getStats(userId: string) {
       prisma.inseminacao.count({
         where: {
           bovino: { fazendaId: { in: fazendaIds } },
-          prenpiez: null,
+          prenhez: null,
         },
       }),
       prisma.registroSanitario.count({
         where: {
           bovino: { fazendaId: { in: fazendaIds } },
           fimCarencia: { gte: new Date() },
+        },
+      }),
+      prisma.lactacao.count({
+        where: {
+          bovino: { fazendaId: { in: fazendaIds }, situacao: "ATIVA", deletedAt: null },
+          fim: null,
+          inicio: { lte: new Date(new Date().getTime() - 240 * 24 * 60 * 60 * 1000) }, // 240 dias em lactação (preparar para secar)
         },
       }),
     ]);
@@ -88,6 +89,7 @@ async function getStats(userId: string) {
     producaoMes: producaoMes._sum.quantidade || 0,
     inseminacoesAbertas,
     alertasCarencia,
+    vacasParaSecar,
   };
 }
 
@@ -95,7 +97,31 @@ export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const stats = await getStats(session.user.id);
+  // Ler fazenda ativa do cookie
+  const cookieStore = await cookies();
+  const fazendaAtivaCookie = cookieStore.get("fazenda-ativa")?.value;
+
+  // Buscar fazendas do usuário
+  const userFazendas = await prisma.usuarioFazenda.findMany({
+    where: { userId: session.user.id },
+    select: { fazendaId: true },
+  });
+  const todasFazendaIds = userFazendas.map((uf) => uf.fazendaId);
+
+  // Determinar quais fazendas filtrar
+  let fazendaIds = todasFazendaIds;
+  let nomeFazendaAtiva = "Todas as Fazendas";
+
+  if (fazendaAtivaCookie && fazendaAtivaCookie !== "todas" && todasFazendaIds.includes(fazendaAtivaCookie)) {
+    fazendaIds = [fazendaAtivaCookie];
+    const fazenda = await prisma.fazenda.findUnique({
+      where: { id: fazendaAtivaCookie },
+      select: { nome: true },
+    });
+    nomeFazendaAtiva = fazenda?.nome || "Fazenda";
+  }
+
+  const stats = await getStats(session.user.id, fazendaIds);
 
   const statCards = [
     {
@@ -148,7 +174,9 @@ export default async function DashboardPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="mt-1 text-gray-500">
-          Visão geral da sua produção leiteira
+          {nomeFazendaAtiva === "Todas as Fazendas"
+            ? "Visão geral de todas as suas fazendas"
+            : `Visão geral — ${nomeFazendaAtiva}`}
         </p>
       </div>
 
@@ -178,6 +206,49 @@ export default async function DashboardPage() {
             </div>
           );
         })}
+      </div>
+
+      {/* Alertas e Agendamentos */}
+      <div className="grid gap-6 md:grid-cols-2 mt-8">
+        {/* Alertas de Secagem */}
+        {stats.vacasParaSecar > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 animate-fade-in shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100">
+                <AlertTriangle className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-amber-900">Atenção: Secagem Requerida</h3>
+                <p className="text-sm text-amber-700 mt-1">
+                  Você tem <strong>{stats.vacasParaSecar} vaca(s)</strong> ultrapassando 240 dias em lactação. Programe a secagem para garantir o descanso pé-parto.
+                </p>
+              </div>
+            </div>
+            <a href="/lactacao" className="mt-4 inline-block text-sm font-medium text-amber-800 hover:text-amber-900 underline">
+              Gerenciar lactações &rarr;
+            </a>
+          </div>
+        )}
+
+        {/* Campanha Aftosa (Maio/Novembro) */}
+        {([4, 10].includes(new Date().getMonth())) && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-6 animate-fade-in shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100">
+                <FlaskConical className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-blue-900">Campanha de Vacinação</h3>
+                <p className="text-sm text-blue-700 mt-1">
+                  Mês de campanha de vacinação mandatória (Aftosa/Brucelose). Certifique-se de registrar o lote de vacina para todos os animais ativos.
+                </p>
+              </div>
+            </div>
+            <a href="/sanitario/lote" className="mt-4 inline-block text-sm font-medium text-blue-800 hover:text-blue-900 underline">
+              Lançamento Sanitário em Lote &rarr;
+            </a>
+          </div>
+        )}
       </div>
 
       {/* Quick info */}

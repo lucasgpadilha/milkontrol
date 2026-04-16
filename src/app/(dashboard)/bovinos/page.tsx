@@ -9,9 +9,13 @@ import {
   Trash2,
   Loader2,
   Filter,
-  Baby,
   Milk,
+  Fence,
+  Eye,
+  FileSpreadsheet,
 } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/hint";
 import { Input } from "@/components/ui/input";
@@ -19,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { calcularDEL, formatDate } from "@/lib/utils";
+import { useFazendaAtiva } from "@/components/fazenda-context";
 
 interface Bovino {
   id: string;
@@ -28,13 +33,13 @@ interface Bovino {
   dataNascimento: string;
   sexo: "MACHO" | "FEMEA";
   situacao: "ATIVA" | "VENDIDA" | "MORTA";
-  fazenda: { nome: string };
+  piquete: { id: string; nome: string } | null;
   mae: { id: string; brinco: string; nome: string | null } | null;
   lactacoes: { id: string; inicio: string; fim: string | null }[];
   _count: { producoes: number; inseminacoes: number; filhos: number };
 }
 
-interface Fazenda {
+interface Piquete {
   id: string;
   nome: string;
 }
@@ -52,8 +57,10 @@ const situacaoLabels = {
 };
 
 export default function BovinosPage() {
+  const router = useRouter();
   const [bovinos, setBovinos] = useState<Bovino[]>([]);
-  const [fazendas, setFazendas] = useState<Fazenda[]>([]);
+  const [piquetes, setPiquetes] = useState<Piquete[]>([]);
+  const { fazendaAtiva, todasSelecionadas } = useFazendaAtiva();
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -71,7 +78,7 @@ export default function BovinosPage() {
     maeId: "",
     paiInfo: "",
     observacoes: "",
-    fazendaId: "",
+    piqueteId: "",
   });
 
   const fetchBovinos = async () => {
@@ -85,20 +92,18 @@ export default function BovinosPage() {
     setLoading(false);
   };
 
-  const fetchFazendas = async () => {
-    const res = await fetch("/api/fazendas");
+  const fetchPiquetes = async () => {
+    if (todasSelecionadas) return;
+    const res = await fetch("/api/piquetes");
     const data = await res.json();
-    setFazendas(data);
-    if (data.length > 0 && !form.fazendaId) {
-      setForm((f) => ({ ...f, fazendaId: data[0].id }));
-    }
+    setPiquetes(data);
   };
 
   useEffect(() => {
-    fetchFazendas();
+    fetchPiquetes();
     fetchBovinos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fazendaAtiva]);
 
   useEffect(() => {
     const debounce = setTimeout(() => fetchBovinos(), 300);
@@ -117,7 +122,7 @@ export default function BovinosPage() {
       maeId: "",
       paiInfo: "",
       observacoes: "",
-      fazendaId: fazendas[0]?.id || "",
+      piqueteId: "",
     });
     setEditingId(null);
     setShowForm(false);
@@ -158,16 +163,10 @@ export default function BovinosPage() {
       maeId: b.mae?.id || "",
       paiInfo: "",
       observacoes: "",
-      fazendaId: "",
+      piqueteId: b.piquete?.id || "",
     });
     setEditingId(b.id);
     setShowForm(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Excluir este bovino? Todos os registros relacionados serão perdidos.")) return;
-    await fetch(`/api/bovinos/${id}`, { method: "DELETE" });
-    fetchBovinos();
   };
 
   if (loading) {
@@ -190,17 +189,36 @@ export default function BovinosPage() {
             {bovinos.length} animal{bovinos.length !== 1 ? "is" : ""} cadastrado{bovinos.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <Button
-          onClick={() => {
-            resetForm();
-            setShowForm(true);
-          }}
-          id="add-bovino-btn"
-        >
-          <Plus className="h-4 w-4" />
-          Novo Bovino
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => router.push("/bovinos/importar")}
+            disabled={todasSelecionadas}
+            title={todasSelecionadas ? "Selecione uma fazenda" : "Importar via Planilha"}
+          >
+            <FileSpreadsheet className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Importar</span>
+          </Button>
+          <Button
+            onClick={() => {
+              resetForm();
+              setShowForm(true);
+            }}
+            disabled={todasSelecionadas}
+            title={todasSelecionadas ? "Selecione uma fazenda para cadastrar bovinos" : ""}
+            id="add-bovino-btn"
+          >
+            <Plus className="h-4 w-4" />
+            Novo Bovino
+          </Button>
+        </div>
       </div>
+
+      {todasSelecionadas && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          <strong>Dica:</strong> Para cadastrar um novo bovino, selecione primeiro uma fazenda específica no seletor do menu lateral.
+        </div>
+      )}
 
       <Hint id="bovinos-intro" title="Gerencie seu rebanho">
         Cadastre cada animal com brinco, raça e data de nascimento. Use os filtros para encontrar animais rapidamente.
@@ -251,25 +269,6 @@ export default function BovinosPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {!editingId && (
-                  <div className="space-y-2">
-                    <Label>Fazenda *</Label>
-                    <select
-                      value={form.fazendaId}
-                      onChange={(e) =>
-                        setForm({ ...form, fazendaId: e.target.value })
-                      }
-                      className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                      required
-                    >
-                      {fazendas.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.nome}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
                 <div className="space-y-2">
                   <Label htmlFor="brinco">Brinco *</Label>
                   <Input
@@ -378,6 +377,23 @@ export default function BovinosPage() {
                     placeholder="Touro ou código do sêmen"
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label>Piquete</Label>
+                  <select
+                    value={form.piqueteId}
+                    onChange={(e) =>
+                      setForm({ ...form, piqueteId: e.target.value })
+                    }
+                    className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  >
+                    <option value="">Nenhum piquete atribuído</option>
+                    {piquetes.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div className="flex gap-2">
                 <Button type="submit" disabled={saving}>
@@ -422,7 +438,7 @@ export default function BovinosPage() {
                   <th>Nascimento</th>
                   <th>Situação</th>
                   <th>Lactação</th>
-                  <th>Fazenda</th>
+                  <th>Piquete</th>
                   <th className="text-right">Ações</th>
                 </tr>
               </thead>
@@ -435,8 +451,12 @@ export default function BovinosPage() {
                     : null;
 
                   return (
-                    <tr key={b.id} className="animate-fade-in">
-                      <td className="font-medium text-gray-900">{b.brinco}</td>
+                    <tr key={b.id} className="animate-fade-in group">
+                      <td className="font-medium">
+                         <Link href={`/bovinos/${b.id}`} className="text-emerald-700 hover:text-emerald-800 hover:underline">
+                            {b.brinco}
+                         </Link>
+                      </td>
                       <td>{b.nome || "—"}</td>
                       <td>{b.raca}</td>
                       <td>
@@ -464,22 +484,31 @@ export default function BovinosPage() {
                           "—"
                         )}
                       </td>
-                      <td className="text-gray-500">{b.fazenda.nome}</td>
+                      <td>
+                        {b.piquete ? (
+                          <span className="flex items-center gap-1.5 font-medium text-emerald-700">
+                            <Fence className="h-3.5 w-3.5 text-emerald-500" />
+                            {b.piquete.nome}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 text-sm italic">Sem piquete</span>
+                        )}
+                      </td>
                       <td className="text-right">
                         <div className="flex justify-end gap-1">
+                          <Link
+                            href={`/bovinos/${b.id}`}
+                            className="rounded-md p-1.5 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                            title="Ver Ficha e Gráficos"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Link>
                           <button
                             onClick={() => handleEdit(b)}
                             className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                            title="Editar"
+                            title="Editar Situação / Dados"
                           >
                             <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(b.id)}
-                            className="rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
-                            title="Excluir"
-                          >
-                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </td>

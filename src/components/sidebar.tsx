@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import {
   LayoutDashboard,
-  Warehouse,
   Beef,
   Milk,
   Baby,
@@ -18,27 +17,51 @@ import {
   ChevronRight,
   Menu,
   HelpCircle,
+  Fence,
+  Stethoscope,
+  Snowflake,
+  Wheat,
+  Brain,
+  KeyRound,
+  BookOpen,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { SeletorFazenda } from "@/components/seletor-fazenda";
+import { useFazendaAtiva } from "@/components/fazenda-context";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/fazendas", label: "Fazendas", icon: Warehouse },
+  { type: "separator" as const },
   { href: "/bovinos", label: "Bovinos", icon: Beef },
-  { href: "/producao", label: "Produção", icon: Milk },
   { href: "/bezerros", label: "Bezerros", icon: Baby },
-  { href: "/lactacao", label: "Lactação", icon: FlaskConical },
-  { href: "/reproducao", label: "Reprodução", icon: Heart },
-  { href: "/tanque", label: "Tanque", icon: FlaskConical },
-  { href: "/sanitario", label: "Sanitário", icon: Syringe },
-  { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
+  { href: "/piquetes", label: "Piquetes", icon: Fence },
+  { href: "/veterinarios", label: "Veterinários", icon: Stethoscope },
+  { type: "separator" as const },
+  { href: "/producao", label: "Produção", icon: Milk, roles: ["PROPRIETARIO", "GERENTE", "OPERADOR"] },
+  { href: "/lactacao", label: "Lactação", icon: FlaskConical, roles: ["PROPRIETARIO", "GERENTE", "OPERADOR"] },
+  { href: "/tanque", label: "Tanque", icon: FlaskConical, roles: ["PROPRIETARIO", "GERENTE"] },
+  { type: "separator" as const },
+  { href: "/semen", label: "Banco de Sêmen", icon: Snowflake, roles: ["PROPRIETARIO", "GERENTE", "VETERINARIO"] },
+  { href: "/reproducao", label: "Reprodução", icon: Heart, roles: ["PROPRIETARIO", "GERENTE", "VETERINARIO"] },
+  { type: "separator" as const },
+  { href: "/sanitario", label: "Sanitário", icon: Syringe, roles: ["PROPRIETARIO", "GERENTE", "OPERADOR", "VETERINARIO"] },
+  { href: "/alimentacao", label: "Alimentação", icon: Wheat, roles: ["PROPRIETARIO", "GERENTE", "OPERADOR"] },
+  { type: "separator" as const },
+  { href: "/inteligencia", label: "Inteligência", icon: Brain, roles: ["PROPRIETARIO", "GERENTE"] },
+  { href: "/relatorios", label: "Relatórios", icon: BarChart3, roles: ["PROPRIETARIO", "GERENTE"] },
+  { type: "separator" as const },
+  { href: "/equipe", label: "Equipe", icon: Users, roles: ["PROPRIETARIO"] },
+  { href: "/api-keys", label: "API Keys", icon: KeyRound, roles: ["PROPRIETARIO"] },
+  { href: "/api-docs", label: "Docs API", icon: BookOpen, roles: ["PROPRIETARIO", "GERENTE", "VETERINARIO"] },
   { href: "/ajuda", label: "Ajuda", icon: HelpCircle },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const { papelAtivo } = useFazendaAtiva();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -107,24 +130,43 @@ export function Sidebar() {
           </button>
         </div>
 
+        {/* Seletor de Fazenda (Workspace) */}
+        <SeletorFazenda collapsed={collapsed} />
+
         {/* Navigation */}
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {navItems.map((item) => {
+        <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
+          {navItems.map((item, idx) => {
+            if ("type" in item && item.type === "separator") {
+              // Somente renderiza separador se o próximo item for visível, mas p/ simplificar renderizamos sempre (css handles excess)
+              return (
+                <div
+                  key={`sep-${idx}`}
+                  className={cn("my-2 border-t border-gray-100", collapsed && "mx-1")}
+                />
+              );
+            }
+
+            const navItem = item as { href: string; label: string; icon: React.ComponentType<{ className?: string }>; roles?: string[] };
+            
+            // Check roles
+            if (navItem.roles && papelAtivo && !navItem.roles.includes(papelAtivo)) {
+              return null;
+            }
             const isActive =
-              pathname === item.href ||
-              (item.href !== "/" && pathname.startsWith(item.href));
-            const Icon = item.icon;
+              pathname === navItem.href ||
+              (navItem.href !== "/" && pathname.startsWith(navItem.href));
+            const Icon = navItem.icon;
 
             return (
               <Link
-                key={item.href}
-                href={item.href}
+                key={navItem.href}
+                href={navItem.href}
                 onClick={() => setMobileOpen(false)}
                 className={cn("sidebar-link", isActive && "active")}
-                title={collapsed ? item.label : undefined}
+                title={collapsed ? navItem.label : undefined}
               >
                 <Icon className="h-5 w-5 shrink-0" />
-                {!collapsed && <span>{item.label}</span>}
+                {!collapsed && <span>{navItem.label}</span>}
               </Link>
             );
           })}

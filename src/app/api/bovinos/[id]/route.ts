@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { bovinoSchema } from "@/lib/validators";
+import { assertOwnership } from "@/lib/ownership";
 
 export async function GET(
   _req: NextRequest,
@@ -41,12 +42,12 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  }
-
   const { id } = await params;
+
+  // Ownership check: verifica se o bovino pertence à fazenda do usuário
+  const check = await assertOwnership("bovino", id);
+  if (!check) return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
+
   const body = await req.json();
   const validation = bovinoSchema.safeParse(body);
 
@@ -72,13 +73,17 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  }
-
   const { id } = await params;
-  await prisma.bovino.delete({ where: { id } });
 
-  return NextResponse.json({ message: "Bovino excluído" });
+  // Ownership check: verifica se o bovino pertence à fazenda do usuário
+  const check = await assertOwnership("bovino", id);
+  if (!check) return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
+
+  // Implementação de Soft Delete
+  await prisma.bovino.update({
+    where: { id },
+    data: { deletedAt: new Date() }
+  });
+
+  return NextResponse.json({ message: "Bovino enviado para lixeira (arquivado)" });
 }

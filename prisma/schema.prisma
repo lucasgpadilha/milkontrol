@@ -8,46 +8,154 @@ datasource db {
 
 // ─── Auth ────────────────────────────────────────────────────────────
 
+// @deprecated — Enum legado. Usar PapelFazenda no UsuarioFazenda para RBAC.
 enum Role {
   ADMIN
   USER
 }
 
+enum PapelFazenda {
+  PROPRIETARIO
+  GERENTE
+  OPERADOR
+  VETERINARIO
+}
+
 model User {
-  id            String    @id @default(cuid())
-  nome          String
-  email         String    @unique
-  senha         String
-  role          Role      @default(USER)
-  criadoEm      DateTime  @default(now())
-  atualizadoEm  DateTime  @updatedAt
-  fazendas      UsuarioFazenda[]
+  id              String    @id @default(cuid())
+  nome            String
+  email           String    @unique
+  senha           String
+  role            Role      @default(USER)
+  fazendaAtivaId  String?
+  fazendaAtiva    Fazenda?  @relation("FazendaAtiva", fields: [fazendaAtivaId], references: [id])
+  criadoEm        DateTime  @default(now())
+  atualizadoEm    DateTime  @updatedAt
+  fazendas        UsuarioFazenda[]
+  apiKeys         ApiKey[]
 }
 
 model UsuarioFazenda {
   id         String   @id @default(cuid())
   userId     String
   fazendaId  String
-  papel      Role     @default(USER)
+  papel      PapelFazenda @default(OPERADOR)
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   fazenda    Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
 
   @@unique([userId, fazendaId])
 }
 
+model ConviteFazenda {
+  id        String       @id @default(cuid())
+  email     String
+  papel     PapelFazenda
+  fazendaId String
+  fazenda   Fazenda      @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  token     String       @unique
+  expiraEm  DateTime
+  criadoEm  DateTime     @default(now())
+
+  @@unique([email, fazendaId])
+}
+
+// ─── Banco de Sêmen ────────────────────────────────────────────────
+
+model BancoSemen {
+  id              String         @id @default(cuid())
+  codigo          String
+  nomeTouro       String
+  raca            String?
+  fornecedor      String?
+  origem          String?
+  quantidade      Int            @default(0)
+  fazendaId       String
+  fazenda         Fazenda        @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  inseminacoes    Inseminacao[]
+  criadoEm        DateTime       @default(now())
+  atualizadoEm    DateTime       @updatedAt
+
+  @@index([fazendaId])
+}
+
+// ─── Veterinários ───────────────────────────────────────────────────
+
+model Veterinario {
+  id              String    @id @default(cuid())
+  nome            String
+  crmv            String?   // Registro no CRMV (ex: CRMV-PR 12345)
+  especialidade   String?   // Ex: Reprodução, Clínica, Cirurgia
+  telefone        String?
+  email           String?
+  ativo           Boolean   @default(true)
+  fazendaId       String
+  fazenda         Fazenda   @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  criadoEm        DateTime  @default(now())
+  atualizadoEm    DateTime  @updatedAt
+  inseminacoes    Inseminacao[]
+  registrosSanitarios RegistroSanitario[]
+
+  @@index([fazendaId])
+}
+
 // ─── Fazenda ─────────────────────────────────────────────────────────
 
 model Fazenda {
-  id           String    @id @default(cuid())
-  nome         String
-  endereco     String?
-  cidade       String?
-  estado       String?
-  criadoEm     DateTime  @default(now())
-  atualizadoEm DateTime  @updatedAt
-  usuarios     UsuarioFazenda[]
-  bovinos      Bovino[]
-  tanques      Tanque[]
+  id            String    @id @default(cuid())
+  nome          String
+  endereco      String?
+  cidade        String?
+  estado        String?
+  ordenhasDia   Int       @default(2)  // 2 ou 3 ordenhas por dia
+  criadoEm      DateTime  @default(now())
+  atualizadoEm  DateTime  @updatedAt
+  usuarios      UsuarioFazenda[]
+  bovinos       Bovino[]
+  tanques       Tanque[]
+  piquetes      Piquete[]
+  veterinarios  Veterinario[]
+  estoqueSemen  BancoSemen[]
+  registrosAlimentacao RegistroAlimentacao[]
+  usuariosAtivos User[]   @relation("FazendaAtiva")
+  apiKeys        ApiKey[]
+  convites       ConviteFazenda[]
+}
+
+// ─── API Keys ───────────────────────────────────────────────────────
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  nome        String                          // "App do Laticínio", "Balança IoT"
+  key         String    @unique               // hash SHA-256 da chave
+  prefixo     String                          // primeiros 8 chars "mk_ab12..."
+  fazendaId   String
+  fazenda     Fazenda   @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  scopes      String[]  @default(["read"])    // ["read", "write", "delete"]
+  ativo       Boolean   @default(true)
+  ultimoUso   DateTime?
+  criadoEm    DateTime  @default(now())
+  expiraEm    DateTime?                       // null = sem expiração
+
+  @@index([key])
+  @@index([fazendaId])
+}
+
+// ─── Piquetes ───────────────────────────────────────────────────────
+
+model Piquete {
+  id            String    @id @default(cuid())
+  nome          String
+  descricao     String?
+  fazendaId     String
+  fazenda       Fazenda   @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  bovinos       Bovino[]
+  registrosAlimentacao RegistroAlimentacao[]
+  criadoEm      DateTime  @default(now())
+  atualizadoEm  DateTime  @updatedAt
+
+  @@unique([nome, fazendaId])
 }
 
 // ─── Bovinos ─────────────────────────────────────────────────────────
@@ -75,6 +183,8 @@ model Bovino {
   observacoes     String?
   fazendaId       String
   fazenda         Fazenda         @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  piqueteId       String?
+  piquete         Piquete?        @relation(fields: [piqueteId], references: [id], onDelete: SetNull)
   maeId           String?
   mae             Bovino?         @relation("MaeFilho", fields: [maeId], references: [id])
   filhos          Bovino[]        @relation("MaeFilho")
@@ -83,19 +193,41 @@ model Bovino {
   lactacoes       Lactacao[]
   inseminacoes    Inseminacao[]
   registrosSanitarios RegistroSanitario[]
+  pesagens        Pesagem[]
   criadoEm        DateTime        @default(now())
   atualizadoEm    DateTime        @updatedAt
+  deletedAt       DateTime?       // Soft delete field
 
   @@unique([brinco, fazendaId])
 }
 
+// ─── Pesagem ─────────────────────────────────────────────────────────
+
+model Pesagem {
+  id          String   @id @default(cuid())
+  data        DateTime
+  pesoKg      Float
+  bovinoId    String
+  bovino      Bovino   @relation(fields: [bovinoId], references: [id], onDelete: Cascade)
+  observacoes String?
+  criadoEm    DateTime @default(now())
+
+  @@index([bovinoId, data])
+}
+
 // ─── Produção de Leite ───────────────────────────────────────────────
+
+enum Turno {
+  MANHA
+  TARDE
+  NOITE     // Apenas para fazendas com 3 ordenhas
+}
 
 model ProducaoLeite {
   id          String   @id @default(cuid())
   data        DateTime
   quantidade  Float    // litros
-  turno       String?  // MANHA, TARDE
+  turno       Turno?
   bovinoId    String
   bovino      Bovino   @relation(fields: [bovinoId], references: [id], onDelete: Cascade)
   criadoEm    DateTime @default(now())
@@ -124,17 +256,21 @@ enum TipoInseminacao {
 }
 
 model Inseminacao {
-  id            String           @id @default(cuid())
-  data          DateTime
-  tipo          TipoInseminacao
-  responsavel   String
-  touroSemen    String?          // Identificação do touro ou sêmen
-  prenpiez      Boolean?
+  id              String           @id @default(cuid())
+  data            DateTime
+  tipo            TipoInseminacao
+  responsavel     String
+  touroSemen      String?          // Identificação do touro ou sêmen
+  prenhez         Boolean?
   dataDiagnostico DateTime?
-  observacoes   String?
-  bovinoId      String
-  bovino        Bovino           @relation(fields: [bovinoId], references: [id], onDelete: Cascade)
-  criadoEm      DateTime         @default(now())
+  observacoes     String?
+  bovinoId        String
+  bovino          Bovino           @relation(fields: [bovinoId], references: [id], onDelete: Cascade)
+  veterinarioId   String?
+  veterinario     Veterinario?     @relation(fields: [veterinarioId], references: [id], onDelete: SetNull)
+  bancoSemenId    String?
+  bancoSemen      BancoSemen?      @relation(fields: [bancoSemenId], references: [id], onDelete: SetNull)
+  criadoEm        DateTime         @default(now())
 
   @@index([bovinoId])
 }
@@ -170,6 +306,8 @@ model MovimentacaoTanque {
   tipo        TipoMovimentacao
   tipoSaida   TipoSaida?       // Apenas quando tipo = SAIDA
   quantidade  Float             // litros
+  comprador   String?           // Ex: Laticínio XYZ (Apenas quando tipoSaida = VENDA)
+  precoLitro  Float?            // R$ por Litro (Apenas quando tipoSaida = VENDA)
   tanqueId    String
   tanque      Tanque            @relation(fields: [tanqueId], references: [id], onDelete: Cascade)
   criadoEm    DateTime          @default(now())
@@ -187,18 +325,50 @@ enum TipoRegistroSanitario {
 }
 
 model RegistroSanitario {
-  id            String                 @id @default(cuid())
-  data          DateTime
-  tipo          TipoRegistroSanitario
-  produto       String                 // Nome do medicamento/vacina
-  dose          String?
-  responsavel   String?
-  diasCarencia  Int                    @default(0) // Dias de carência do leite
-  fimCarencia   DateTime?              // Data calculada: data + diasCarencia
-  observacoes   String?
-  bovinoId      String
-  bovino        Bovino                 @relation(fields: [bovinoId], references: [id], onDelete: Cascade)
-  criadoEm      DateTime               @default(now())
+  id              String                 @id @default(cuid())
+  data            DateTime
+  tipo            TipoRegistroSanitario
+  produto         String                 // Nome do medicamento/vacina
+  dose            String?
+  responsavel     String?
+  diasCarencia    Int                    @default(0) // Dias de carência do leite
+  fimCarencia     DateTime?              // Data calculada: data + diasCarencia
+  observacoes     String?
+  bovinoId        String
+  bovino          Bovino                 @relation(fields: [bovinoId], references: [id], onDelete: Cascade)
+  veterinarioId   String?
+  veterinario     Veterinario?           @relation(fields: [veterinarioId], references: [id], onDelete: SetNull)
+  criadoEm        DateTime               @default(now())
 
   @@index([bovinoId])
+}
+
+// ─── Alimentação ─────────────────────────────────────────────────────
+
+enum TipoAlimento {
+  SILAGEM
+  RACAO
+  FENO
+  SAL_MINERAL
+  CONCENTRADO
+  PASTO
+  OUTRO
+}
+
+model RegistroAlimentacao {
+  id              String        @id @default(cuid())
+  data            DateTime
+  tipoAlimento    TipoAlimento
+  descricao       String?       // Ex: "Silagem de milho safra 2026"
+  quantidadeKg    Float         // Kg por cabeça/dia
+  custoUnitario   Float?        // R$ por Kg (opcional, para cálculo futuro)
+  piqueteId       String
+  piquete         Piquete       @relation(fields: [piqueteId], references: [id], onDelete: Cascade)
+  fazendaId       String
+  fazenda         Fazenda       @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  observacoes     String?
+  criadoEm        DateTime      @default(now())
+
+  @@index([fazendaId, data])
+  @@index([piqueteId])
 }

@@ -16,7 +16,7 @@ interface Tanque {
   capacidadeMax: number;
   volumeAtual: number;
   fazenda: { nome: string };
-  movimentacoes: { id: string; data: string; tipo: string; tipoSaida: string | null; quantidade: number }[];
+  movimentacoes: { id: string; data: string; tipo: string; tipoSaida: string | null; quantidade: number; comprador: string | null; precoLitro: number | null }[];
 }
 
 interface Fazenda { id: string; nome: string; }
@@ -36,6 +36,8 @@ export default function TanquePage() {
     tipoSaida: "VENDA",
     quantidade: "",
     tanqueId: "",
+    comprador: "",
+    precoLitro: "",
   });
 
   const fetchData = async () => {
@@ -73,6 +75,8 @@ export default function TanquePage() {
         ...movForm,
         quantidade: parseFloat(movForm.quantidade),
         tipoSaida: movForm.tipo === "SAIDA" ? movForm.tipoSaida : undefined,
+        comprador: movForm.tipo === "SAIDA" && movForm.tipoSaida === "VENDA" && movForm.comprador ? movForm.comprador : undefined,
+        precoLitro: movForm.tipo === "SAIDA" && movForm.tipoSaida === "VENDA" && movForm.precoLitro ? parseFloat(movForm.precoLitro) : undefined,
       }),
     });
     const data = await res.json();
@@ -160,6 +164,19 @@ export default function TanquePage() {
                   </div>
                 )}
                 <div className="space-y-2"><Label>Quantidade (L) *</Label><Input type="number" step="0.1" value={movForm.quantidade} onChange={(e) => setMovForm({ ...movForm, quantidade: e.target.value })} required /></div>
+                
+                {movForm.tipo === "SAIDA" && movForm.tipoSaida === "VENDA" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Comprador</Label>
+                      <Input value={movForm.comprador} onChange={(e) => setMovForm({ ...movForm, comprador: e.target.value })} placeholder="Ex: Laticínio XYZ" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Preço por Litro (R$)</Label>
+                      <Input type="number" step="0.01" value={movForm.precoLitro} onChange={(e) => setMovForm({ ...movForm, precoLitro: e.target.value })} placeholder="Ex: 2.50" />
+                    </div>
+                  </>
+                )}
               </div>
               <div className="flex gap-2">
                 <Button type="submit" disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Registrar"}</Button>
@@ -202,17 +219,32 @@ export default function TanquePage() {
                     <p className="text-xs font-medium text-gray-500 uppercase">Últimas movimentações</p>
                     {t.movimentacoes.slice(0, 5).map((m) => (
                       <div key={m.id} className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          {m.tipo === "ENTRADA" ? (
-                            <ArrowUpCircle className="h-4 w-4 text-emerald-500" />
-                          ) : (
-                            <ArrowDownCircle className="h-4 w-4 text-red-400" />
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-2">
+                            {m.tipo === "ENTRADA" ? (
+                              <ArrowUpCircle className="h-4 w-4 text-emerald-500" />
+                            ) : (
+                              <ArrowDownCircle className="h-4 w-4 text-red-400" />
+                            )}
+                            <span className="text-gray-600 font-medium">{formatDate(m.data)}</span>
+                          </div>
+                          {m.tipo === "SAIDA" && m.tipoSaida === "VENDA" && (
+                            <span className="text-xs text-gray-500 ml-6">
+                              {m.comprador && `${m.comprador} `}
+                              {m.precoLitro ? `(R$ ${m.precoLitro.toFixed(2)}/L)` : ""}
+                            </span>
                           )}
-                          <span className="text-gray-600">{formatDate(m.data)}</span>
                         </div>
-                        <span className={`font-medium ${m.tipo === "ENTRADA" ? "text-emerald-600" : "text-red-500"}`}>
-                          {m.tipo === "ENTRADA" ? "+" : "-"}{formatNumber(m.quantidade)}L
-                        </span>
+                        <div className="flex flex-col items-end">
+                          <span className={`font-medium ${m.tipo === "ENTRADA" ? "text-emerald-600" : "text-red-500"}`}>
+                            {m.tipo === "ENTRADA" ? "+" : "-"}{formatNumber(m.quantidade)}L
+                          </span>
+                          {m.tipo === "SAIDA" && m.tipoSaida === "VENDA" && m.precoLitro && (
+                            <span className="text-xs font-semibold text-emerald-600">
+                              R$ {(m.quantidade * m.precoLitro).toFixed(2)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

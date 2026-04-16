@@ -1,22 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { lactacaoSchema } from "@/lib/validators";
+import { getFazendaAtivaIds } from "@/lib/fazenda-ativa";
+import { assertRole } from "@/lib/rbac";
 
 export async function GET(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  const ctx = await getFazendaAtivaIds();
+  if (!ctx) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const ativas = searchParams.get("ativas");
 
-  const userFazendas = await prisma.usuarioFazenda.findMany({
-    where: { userId: session.user.id }, select: { fazendaId: true },
-  });
-  const fazendaIds = userFazendas.map((uf) => uf.fazendaId);
-
   const where: Record<string, unknown> = {
-    bovino: { fazendaId: { in: fazendaIds } },
+    bovino: { fazendaId: { in: ctx.fazendaIds } },
   };
   if (ativas === "true") where.fim = null;
 
@@ -30,14 +26,18 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  // RBAC: Somente PROPRIETARIO, GERENTE e OPERADOR podem iniciar/fechar lactação
+  const roleCheck = await assertRole(["PROPRIETARIO", "GERENTE", "OPERADOR"]);
+  if (!roleCheck) return NextResponse.json({ error: "Sem permissão para esta operação" }, { status: 403 });
+
+  const ctx = await getFazendaAtivaIds();
+  if (!ctx) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
 
   const body = await req.json();
   const validation = lactacaoSchema.safeParse(body);
   if (!validation.success) return NextResponse.json({ error: validation.error.issues[0].message }, { status: 400 });
 
-  const bovino = await prisma.bovino.findFirst({ where: { id: validation.data.bovinoId } });
+  const bovino = await prisma.bovino.findFirst({ where: { id: validation.data.bovinoId, fazendaId: { in: ctx.fazendaIds }, deletedAt: null } });
   if (!bovino) return NextResponse.json({ error: "Bovino não encontrado" }, { status: 404 });
   if (bovino.sexo !== "FEMEA") return NextResponse.json({ error: "Apenas vacas podem ter lactação" }, { status: 400 });
 
