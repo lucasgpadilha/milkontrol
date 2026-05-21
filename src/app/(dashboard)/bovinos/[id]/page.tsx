@@ -38,6 +38,10 @@ interface BovinoDetalhe {
   pesagens: {
     id: string; data: string; pesoKg: number; observacoes: string | null;
   }[];
+  mastites: {
+    id: string; data: string; tipo: string; quarto: string;
+    tratamento: string | null; cura: boolean;
+  }[];
 }
 
 export default function FichaAnimalPage() {
@@ -47,7 +51,7 @@ export default function FichaAnimalPage() {
 
   const [bovino, setBovino] = useState<BovinoDetalhe | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"resumo" | "lactacao" | "reproducao" | "sanitario" | "fisico">("resumo");
+  const [activeTab, setActiveTab] = useState<"resumo" | "lactacao" | "reproducao" | "sanitario" | "mastite" | "fisico">("resumo");
 
   const [formPesagem, setFormPesagem] = useState({
     data: new Date().toISOString().split("T")[0],
@@ -243,6 +247,7 @@ export default function FichaAnimalPage() {
           <TabButton tabId="resumo" icon={Activity} label="Curva de Lactação" />
           <TabButton tabId="reproducao" icon={Heart} label="Reprodutivo" />
           <TabButton tabId="sanitario" icon={Syringe} label="Sanitário" />
+          <TabButton tabId="mastite" icon={AlertCircle} label="Mastite" />
           <TabButton tabId="fisico" icon={Activity} label="Físico/Peso" />
         </div>
 
@@ -360,6 +365,46 @@ export default function FichaAnimalPage() {
                             {reg.fimCarencia ? (
                                estaEmCarencia(reg.fimCarencia) ? <span className="text-amber-600 font-medium">Até {formatDate(reg.fimCarencia)}</span> : <span className="text-gray-400">Encerrada</span>
                             ) : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "mastite" && (
+            <div className="animate-fade-in">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2"><AlertCircle className="h-5 w-5 text-gray-400" /> Histórico de Mastite</h3>
+              {bovino.mastites.length === 0 ? (
+                <p className="text-gray-500 py-4">Nenhum registro de mastite para este animal.</p>
+              ) : (
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-50 text-gray-600 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 font-medium">Data</th>
+                        <th className="px-4 py-3 font-medium">Tipo</th>
+                        <th className="px-4 py-3 font-medium">Quarto</th>
+                        <th className="px-4 py-3 font-medium">Tratamento</th>
+                        <th className="px-4 py-3 font-medium">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {bovino.mastites.map(m => (
+                        <tr key={m.id} className={!m.cura ? "bg-red-50/20" : "bg-white hover:bg-gray-50/50"}>
+                          <td className="px-4 py-3">{formatDate(m.data)}</td>
+                          <td className="px-4 py-3">
+                            <Badge variant={m.tipo === "CLINICA" ? "destructive" : "secondary"}>
+                              {m.tipo === "CLINICA" ? "Clínica" : "Subclínica"}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 font-mono font-bold text-gray-700 bg-gray-100 px-2 rounded inline-block mt-2">{m.quarto}</td>
+                          <td className="px-4 py-3 text-gray-800">{m.tratamento || "—"}</td>
+                          <td className="px-4 py-3 font-medium">
+                            {m.cura ? <span className="text-emerald-600">Curada</span> : <span className="text-red-600 flex items-center gap-1"><AlertCircle className="h-3 w-3"/> Ativa</span>}
                           </td>
                         </tr>
                       ))}

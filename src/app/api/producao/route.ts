@@ -65,7 +65,18 @@ export async function POST(req: NextRequest) {
   });
   if (carencia) {
     return NextResponse.json({
-      error: `Vaca em período de carência até ${new Date(carencia.fimCarencia!).toLocaleDateString("pt-BR")}. Leite não pode ser registrado para venda.`,
+      error: `Vaca em período de carência até ${new Date(carencia.fimCarencia!).toLocaleDateString("pt-BR")}. Leite não pode ser registrado para o tanque.`,
+      warning: true,
+    }, { status: 400 });
+  }
+
+  // Check mastite ativa
+  const mastiteAtiva = await prisma.registroMastite.findFirst({
+    where: { bovinoId: bovino.id, cura: false },
+  });
+  if (mastiteAtiva) {
+    return NextResponse.json({
+      error: `Vaca possui caso ativo de Mastite (${mastiteAtiva.tipo} no quarto ${mastiteAtiva.quarto}). Leite bloqueado.`,
       warning: true,
     }, { status: 400 });
   }

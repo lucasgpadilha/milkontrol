@@ -22,7 +22,8 @@ export async function GET(req: NextRequest) {
     where,
     include: { 
       bovino: { select: { brinco: true, nome: true } },
-      veterinario: { select: { nome: true } }
+      veterinario: { select: { nome: true } },
+      insumo: { select: { nome: true } }
     },
     orderBy: { data: "desc" },
   });
@@ -34,6 +35,9 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
 
+  const ctx = await getFazendaAtivaIds();
+  if (!ctx || ctx.todas) return NextResponse.json({ error: "Selecione uma fazenda" }, { status: 400 });
+
   const body = await req.json();
   const validation = registroSanitarioSchema.safeParse(body);
   if (!validation.success) return NextResponse.json({ error: validation.error.issues[0].message }, { status: 400 });
@@ -43,12 +47,42 @@ export async function POST(req: NextRequest) {
     ? new Date(dataRegistro.getTime() + validation.data.diasCarencia * 24 * 60 * 60 * 1000)
     : null;
 
-  const registro = await prisma.registroSanitario.create({
-    data: {
-      ...validation.data,
-      data: dataRegistro,
-      fimCarencia,
-    },
+  let parsedDose = 1;
+  if (validation.data.dose) {
+    const d = parseFloat(validation.data.dose.replace(',', '.'));
+    if (!isNaN(d)) parsedDose = d;
+  }
+
+  const registro = await prisma.$transaction(async (tx) => {
+    if (validation.data.insumoId) {
+      const insumo = await tx.estoqueInsumo.findFirst({
+        where: { id: validation.data.insumoId, fazendaId: { in: ctx.fazendaIds } }
+      });
+      if (!insumo) throw new Error("Insumo não encontrado no estoque.");
+      if (insumo.quantidade < parsedDose) throw new Error("Estoque insuficiente para a dose informada.");
+      
+      await tx.estoqueInsumo.update({
+        where: { id: insumo.id },
+        data: { quantidade: { decrement: parsedDose } }
+      });
+
+      await tx.movimentacaoEstoque.create({
+        data: {
+          tipo: "SAIDA",
+          quantidade: parsedDose,
+          motivo: `Aplicação Sanitária no bovino ID ${validation.data.bovinoId}`,
+          insumoId: insumo.id,
+        }
+      });
+    }
+
+    return await tx.registroSanitario.create({
+      data: {
+        ...validation.data,
+        data: dataRegistro,
+        fimCarencia,
+      },
+    });
   });
 
   return NextResponse.json(registro, { status: 201 });

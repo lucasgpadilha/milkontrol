@@ -483,22 +483,22 @@ export default function InteligenciaPage() {
   return (
     <div className="space-y-8 pb-10">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-md">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-md">
               <Brain className="h-5 w-5 text-white" />
             </div>
-            Inteligência Zootécnica
+            <span className="leading-tight">Inteligência Zootécnica</span>
           </h1>
-          <p className="mt-1 text-gray-500">
+          <p className="mt-2 text-gray-500 text-sm">
             Diagnóstico computado do rebanho em tempo real — Score, ROI,
             Projeções e Alertas Preditivos
           </p>
         </div>
         <Badge
           variant="secondary"
-          className="text-xs font-mono bg-violet-50 text-violet-700 border-violet-200"
+          className="whitespace-nowrap shrink-0 text-sm font-mono bg-violet-50 text-violet-700 border-violet-200 px-3 py-1 self-start sm:self-center"
         >
           R$ {formatNumber(precoBase, 2)}/L base
         </Badge>

@@ -25,6 +25,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" className={inter.variable}>
+      <head>
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="MilKontrol" />
+      </head>
       <body className={`${inter.className} min-h-screen bg-gray-50 antialiased`}>
         <Providers>{children}</Providers>
         <script

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Heart, Loader2, Check, X, Layers, User } from "lucide-react";
+import { Plus, Heart, Loader2, Check, X, Layers, User, CalendarRange } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,7 @@ import { Hint } from "@/components/hint";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
+import Link from "next/link";
 
 interface BancoSemen {
   id: string;
@@ -146,9 +147,16 @@ export default function ReproducaoPage() {
           <h1 className="text-2xl font-bold text-gray-900">Reprodução</h1>
           <p className="mt-1 text-gray-500">{inseminacoes.filter((i) => i.prenhez === null).length} pendente(s) de diagnóstico</p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)} id="add-inseminacao-btn">
-          <Plus className="h-4 w-4" /> Nova Inseminação
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Link href="/reproducao/iatf">
+            <Button variant="outline" className="w-full sm:w-auto border-pink-200 text-pink-700 bg-pink-50 hover:bg-pink-100">
+              <CalendarRange className="h-4 w-4 mr-2" /> Central de IATF
+            </Button>
+          </Link>
+          <Button onClick={() => setShowForm(!showForm)} className="bg-pink-600 hover:bg-pink-700">
+            <Plus className="h-4 w-4 mr-2" /> Registrar
+          </Button>
+        </div>
       </div>
 
       <Hint id="reproducao-intro" title="Controle reprodutivo e Lançamento em Lote">
@@ -305,25 +313,33 @@ export default function ReproducaoPage() {
         </Card>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
         <table className="data-table">
-          <thead><tr><th>Data</th><th>Vaca</th><th>Tipo</th><th>Responsável</th><th>Touro/Sêmen</th><th>Prenhez</th><th>Ações</th></tr></thead>
+          <thead><tr>
+            <th>Data</th>
+            <th>Vaca</th>
+            <th className="hidden sm:table-cell">Tipo</th>
+            <th className="hidden md:table-cell">Responsável</th>
+            <th className="hidden lg:table-cell">Touro/Sêmen</th>
+            <th>Prenhez</th>
+            <th>Ações</th>
+          </tr></thead>
           <tbody>
             {inseminacoes.length === 0 ? (
               <tr><td colSpan={7} className="text-center py-8 text-gray-400">Nenhuma inseminação registrada</td></tr>
             ) : inseminacoes.map((ins) => (
               <tr key={ins.id}>
                 <td>{formatDate(ins.data)}</td>
-                <td className="font-medium">{ins.bovino.brinco} — {ins.bovino.nome || ""}</td>
-                <td><Badge variant={ins.tipo === "ARTIFICIAL" ? "default" : "secondary"}>{ins.tipo === "ARTIFICIAL" ? "IA" : "Natural"}</Badge></td>
-                <td>
+                <td className="font-medium">{ins.bovino.brinco}{ins.bovino.nome ? ` — ${ins.bovino.nome}` : ""}</td>
+                <td className="hidden sm:table-cell"><Badge variant={ins.tipo === "ARTIFICIAL" ? "default" : "secondary"}>{ins.tipo === "ARTIFICIAL" ? "IA" : "Natural"}</Badge></td>
+                <td className="hidden md:table-cell">
                    {ins.veterinario ? (
                      <span className="font-medium text-emerald-700">{ins.veterinario.nome}</span>
                    ) : (
                      ins.responsavel
                    )}
                 </td>
-                <td>
+                <td className="hidden lg:table-cell">
                    {ins.bancoSemen ? (
                      <div className="flex font-medium text-blue-700">{ins.bancoSemen.codigo} - {ins.bancoSemen.nomeTouro}</div>
                    ) : (

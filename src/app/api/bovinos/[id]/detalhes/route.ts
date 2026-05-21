@@ -41,6 +41,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       pesagens: {
         orderBy: { data: "desc" },
       },
+      mastites: {
+        orderBy: { data: "desc" },
+      },
     },
   });
 

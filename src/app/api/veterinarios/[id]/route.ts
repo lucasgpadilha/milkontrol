@@ -3,6 +3,38 @@ import { prisma } from "@/lib/prisma";
 import { veterinarioSchema } from "@/lib/validators";
 import { assertOwnership } from "@/lib/ownership";
 
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+
+  const check = await assertOwnership("veterinario", id);
+  if (!check) return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
+
+  const veterinario = await prisma.veterinario.findUnique({
+    where: { id },
+    include: {
+      inseminacoes: {
+        orderBy: { data: "desc" },
+        include: {
+          bovino: { select: { id: true, brinco: true, nome: true } },
+          bancoSemen: { select: { codigo: true, nomeTouro: true } },
+        },
+      },
+      registrosSanitarios: {
+        orderBy: { data: "desc" },
+        include: {
+          bovino: { select: { id: true, brinco: true, nome: true } },
+        },
+      },
+    },
+  });
+
+  if (!veterinario) {
+    return NextResponse.json({ error: "Veterinário não encontrado" }, { status: 404 });
+  }
+
+  return NextResponse.json(veterinario);
+}
+
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 

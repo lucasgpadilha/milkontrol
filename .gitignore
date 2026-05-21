@@ -24,6 +24,7 @@ next-env.d.ts
 AGENTS.md
 CLAUDE.md
 DOCUMENTO DE AN*.md
+.agents/
 
 # Database
 pgdata/

@@ -8,7 +8,7 @@ datasource db {
 
 // ─── Auth ────────────────────────────────────────────────────────────
 
-// @deprecated — Enum legado. Usar PapelFazenda no UsuarioFazenda para RBAC.
+// Enum para definir a autorização global no sistema SaaS.
 enum Role {
   ADMIN
   USER
@@ -94,6 +94,7 @@ model Veterinario {
   atualizadoEm    DateTime  @updatedAt
   inseminacoes    Inseminacao[]
   registrosSanitarios RegistroSanitario[]
+  mastites        RegistroMastite[]
 
   @@index([fazendaId])
 }
@@ -116,6 +117,12 @@ model Fazenda {
   veterinarios  Veterinario[]
   estoqueSemen  BancoSemen[]
   registrosAlimentacao RegistroAlimentacao[]
+  analises       AnaliseLeite[]
+  eventos        AgendaEvento[]
+  partos         Parto[]
+  estoqueInsumos EstoqueInsumo[]
+  protocolosIatf ProtocoloIatf[]
+  lotesIatf      LoteIatf[]
   usuariosAtivos User[]   @relation("FazendaAtiva")
   apiKeys        ApiKey[]
   convites       ConviteFazenda[]
@@ -194,6 +201,13 @@ model Bovino {
   inseminacoes    Inseminacao[]
   registrosSanitarios RegistroSanitario[]
   pesagens        Pesagem[]
+  mastites        RegistroMastite[]
+  eventos         AgendaEvento[]
+  partos          Parto[]         @relation("Mae")
+  nascimento      Parto?          @relation("Bezerro")
+  lotesIatf       AnimalLoteIatf[]
+  ecc             Float?
+  eccData         DateTime?
   criadoEm        DateTime        @default(now())
   atualizadoEm    DateTime        @updatedAt
   deletedAt       DateTime?       // Soft delete field
@@ -263,6 +277,7 @@ model Inseminacao {
   touroSemen      String?          // Identificação do touro ou sêmen
   prenhez         Boolean?
   dataDiagnostico DateTime?
+  dataPartoPrevisto DateTime?
   observacoes     String?
   bovinoId        String
   bovino          Bovino           @relation(fields: [bovinoId], references: [id], onDelete: Cascade)
@@ -338,6 +353,8 @@ model RegistroSanitario {
   bovino          Bovino                 @relation(fields: [bovinoId], references: [id], onDelete: Cascade)
   veterinarioId   String?
   veterinario     Veterinario?           @relation(fields: [veterinarioId], references: [id], onDelete: SetNull)
+  insumoId        String?
+  insumo          EstoqueInsumo?         @relation(fields: [insumoId], references: [id], onDelete: SetNull)
   criadoEm        DateTime               @default(now())
 
   @@index([bovinoId])
@@ -371,4 +388,208 @@ model RegistroAlimentacao {
 
   @@index([fazendaId, data])
   @@index([piqueteId])
+}
+
+// ─── Qualidade do Leite e Mastite ──────────────────────────────────────
+
+model AnaliseLeite {
+  id         String   @id @default(cuid())
+  data       DateTime
+  ccs        Float    // Contagem de Células Somáticas (1000 cel/mL)
+  cpp        Float    // Contagem Padrão em Placas (UFC/mL)
+  gordura    Float?   // % Gordura (opcional)
+  proteina   Float?   // % Proteína (opcional)
+  esnf       Float?   // Extrato Seco Desengordurado (opcional)
+  laboratorio String? // Nome do laboratório RBQL
+  fazendaId  String
+  fazenda    Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  criadoEm   DateTime @default(now())
+
+  @@index([fazendaId, data])
+}
+
+enum QuartoMamario {
+  AD
+  AE
+  PD
+  PE
+}
+
+enum TipoMastite {
+  CLINICA
+  SUBCLINICA
+}
+
+model RegistroMastite {
+  id          String         @id @default(cuid())
+  data        DateTime
+  tipo        TipoMastite
+  quarto      QuartoMamario
+  resultado   String?        // CMT +/++/+++ ou cultivo bacteriano
+  tratamento  String?        // Produto/protocolo utilizado
+  diasTratamento Int?
+  cura        Boolean?       // Confirmação de cura
+  dataCura    DateTime?
+  observacoes String?
+  bovinoId    String
+  bovino      Bovino         @relation(fields: [bovinoId], references: [id], onDelete: Cascade)
+  veterinarioId String?
+  veterinario   Veterinario? @relation(fields: [veterinarioId], references: [id], onDelete: SetNull)
+  criadoEm      DateTime      @default(now())
+
+  @@index([bovinoId, data])
+}
+
+// ─── Agenda e Partos ───────────────────────────────────────────────────
+
+enum TipoEvento {
+  DIAGNOSTICO_PRENHEZ
+  VACINACAO_PROGRAMADA
+  RETORNO_CARENCIA
+  SECAGEM_PREVISTA
+  PARTO_PREVISTO
+  REVISAO_EQUIPAMENTO
+  IATF_ETAPA
+  OUTRO
+}
+
+enum Prioridade {
+  ALTA
+  MEDIA
+  BAIXA
+}
+
+model AgendaEvento {
+  id            String        @id @default(cuid())
+  titulo        String
+  tipo          TipoEvento
+  dataHora      DateTime
+  concluido     Boolean       @default(false)
+  dataConclusao DateTime?
+  prioridade    Prioridade    @default(MEDIA)
+  notas         String?
+  bovinoId      String?
+  bovino        Bovino?       @relation(fields: [bovinoId], references: [id], onDelete: Cascade)
+  fazendaId     String
+  fazenda       Fazenda       @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  criadoEm      DateTime      @default(now())
+
+  @@index([fazendaId, dataHora])
+  @@index([bovinoId])
+}
+
+enum TipoParto {
+  NORMAL
+  DISTOCICO
+  CESAREA
+  ABORTO
+  NATIMORTO
+}
+
+model Parto {
+  id              String     @id @default(cuid())
+  data            DateTime
+  tipoParto       TipoParto
+  pesoBezerroKg   Float?
+  sexoBezerro     Sexo?
+  colostroFornecido Boolean  @default(false)
+  gemelar         Boolean    @default(false)
+  observacoes     String?
+  bovinoId        String
+  bovino          Bovino     @relation("Mae", fields: [bovinoId], references: [id], onDelete: Cascade)
+  bezerroId       String?    @unique
+  bezerro         Bovino?    @relation("Bezerro", fields: [bezerroId], references: [id], onDelete: SetNull)
+  fazendaId       String
+  fazenda         Fazenda    @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  criadoEm        DateTime   @default(now())
+
+  @@index([bovinoId])
+  @@index([fazendaId, data])
+}
+
+// ─── Estoque de Insumos ──────────────────────────────────────────────────
+
+enum TipoInsumo {
+  MEDICAMENTO
+  VACINA
+  SUPLEMENTO
+  OUTRO
+}
+
+model EstoqueInsumo {
+  id              String         @id @default(cuid())
+  nome            String
+  tipo            TipoInsumo
+  quantidade      Float          @default(0)
+  unidade         String         // mL, Doses, Kg, etc.
+  estoqueMinimo   Float          @default(0)
+  observacoes     String?
+  fazendaId       String
+  fazenda         Fazenda        @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  movimentacoes   MovimentacaoEstoque[]
+  usosSanitarios  RegistroSanitario[]
+  criadoEm        DateTime       @default(now())
+  atualizadoEm    DateTime       @updatedAt
+
+  @@index([fazendaId])
+}
+
+model MovimentacaoEstoque {
+  id            String         @id @default(cuid())
+  tipo          TipoMovimentacao
+  quantidade    Float
+  motivo        String?        // Compra, Aplicação, Descarte
+  insumoId      String
+  insumo        EstoqueInsumo  @relation(fields: [insumoId], references: [id], onDelete: Cascade)
+  usuarioId     String?        // Quem registrou (opcional)
+  data          DateTime       @default(now())
+
+  @@index([insumoId])
+}
+
+// ─── IATF (Inseminação Artificial em Tempo Fixo) ─────────────────────────
+
+model ProtocoloIatf {
+  id          String   @id @default(cuid())
+  nome        String
+  descricao   String?
+  fazendaId   String?  // null se for um template global
+  fazenda     Fazenda? @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  etapas      EtapaIatf[]
+  lotes       LoteIatf[]
+  criadoEm    DateTime @default(now())
+}
+
+model EtapaIatf {
+  id            String   @id @default(cuid())
+  dia           Int
+  titulo        String
+  descricao     String?
+  protocoloId   String
+  protocolo     ProtocoloIatf @relation(fields: [protocoloId], references: [id], onDelete: Cascade)
+}
+
+model LoteIatf {
+  id            String   @id @default(cuid())
+  nome          String
+  dataInicio    DateTime
+  protocoloId   String
+  protocolo     ProtocoloIatf @relation(fields: [protocoloId], references: [id])
+  fazendaId     String
+  fazenda       Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  animais       AnimalLoteIatf[]
+  criadoEm      DateTime @default(now())
+
+  @@index([fazendaId])
+}
+
+model AnimalLoteIatf {
+  id          String   @id @default(cuid())
+  loteId      String
+  lote        LoteIatf @relation(fields: [loteId], references: [id], onDelete: Cascade)
+  bovinoId    String
+  bovino      Bovino   @relation(fields: [bovinoId], references: [id])
+
+  @@index([loteId])
+  @@index([bovinoId])
 }

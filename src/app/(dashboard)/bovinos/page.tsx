@@ -13,6 +13,7 @@ import {
   Fence,
   Eye,
   FileSpreadsheet,
+  Download,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -24,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { calcularDEL, formatDate } from "@/lib/utils";
 import { useFazendaAtiva } from "@/components/fazenda-context";
+import { exportToCSV } from "@/lib/csv-export";
 
 interface Bovino {
   id: string;
@@ -82,7 +84,7 @@ export default function BovinosPage() {
   });
 
   const fetchBovinos = async () => {
-    const params = new URLSearchParams();
+    const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
     if (busca) params.set("busca", busca);
     if (filtroSexo) params.set("sexo", filtroSexo);
     if (filtroSituacao) params.set("situacao", filtroSituacao);
@@ -186,10 +188,27 @@ export default function BovinosPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Bovinos</h1>
           <p className="mt-1 text-gray-500">
-            {bovinos.length} animal{bovinos.length !== 1 ? "is" : ""} cadastrado{bovinos.length !== 1 ? "s" : ""}
+            {bovinos.length} anim{bovinos.length !== 1 ? "ais" : "al"} cadastrado{bovinos.length !== 1 ? "s" : ""}
           </p>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportToCSV(bovinos, [
+              { header: "Brinco", accessor: (b) => b.brinco },
+              { header: "Nome", accessor: (b) => b.nome },
+              { header: "Raça", accessor: (b) => b.raca },
+              { header: "Sexo", accessor: (b) => b.sexo === "FEMEA" ? "Fêmea" : "Macho" },
+              { header: "Nascimento", accessor: (b) => formatDate(b.dataNascimento) },
+              { header: "Situação", accessor: (b) => situacaoLabels[b.situacao] },
+              { header: "Piquete", accessor: (b) => b.piquete?.nome },
+            ], `bovinos_${new Date().toISOString().split("T")[0]}`)}
+            title="Exportar lista para CSV"
+          >
+            <Download className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Exportar</span>
+          </Button>
           <Button
             variant="outline"
             onClick={() => router.push("/bovinos/importar")}
@@ -439,7 +458,7 @@ export default function BovinosPage() {
                   <th>Situação</th>
                   <th>Lactação</th>
                   <th>Piquete</th>
-                  <th className="text-right">Ações</th>
+                  <th className="text-right sticky right-0 z-10 bg-gray-50 shadow-[-4px_0_6px_-1px_rgb(0,0,0,0.05)]">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -494,7 +513,7 @@ export default function BovinosPage() {
                           <span className="text-gray-400 text-sm italic">Sem piquete</span>
                         )}
                       </td>
-                      <td className="text-right">
+                      <td className="text-right sticky right-0 z-10 bg-white group-hover:bg-[#f1fcf8] shadow-[-4px_0_6px_-1px_rgb(0,0,0,0.05)] transition-colors">
                         <div className="flex justify-end gap-1">
                           <Link
                             href={`/bovinos/${b.id}`}

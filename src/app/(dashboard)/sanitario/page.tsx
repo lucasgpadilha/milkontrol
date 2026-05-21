@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Syringe, Loader2, AlertTriangle } from "lucide-react";
+import { Plus, Syringe, Loader2, AlertTriangle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,7 @@ import { Hint } from "@/components/hint";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatDate, estaEmCarencia } from "@/lib/utils";
+import { exportToCSV } from "@/lib/csv-export";
 
 interface RegistroSanitario {
   id: string;
@@ -22,6 +23,7 @@ interface RegistroSanitario {
   observacoes: string | null;
   bovino: { brinco: string; nome: string | null };
   veterinario?: { nome: string } | null;
+  insumo?: { nome: string } | null;
 }
 
 interface Bovino { id: string; brinco: string; nome: string | null; }
@@ -37,6 +39,7 @@ export default function SanitarioPage() {
   const [registros, setRegistros] = useState<RegistroSanitario[]>([]);
   const [bovinos, setBovinos] = useState<Bovino[]>([]);
   const [veterinarios, setVeterinarios] = useState<{id: string, nome: string, ativo: boolean}[]>([]);
+  const [insumos, setInsumos] = useState<{id: string, nome: string, quantidade: number, unidade: string}[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -51,19 +54,21 @@ export default function SanitarioPage() {
     observacoes: "",
     bovinoId: "",
     veterinarioId: "",
+    insumoId: "",
   });
 
   const fetchData = async () => {
     const params = filtroCarencia ? "?emCarencia=true" : "";
-    const [regRes, bovRes, vetRes] = await Promise.all([
+    const [regRes, bovRes, vetRes, insRes] = await Promise.all([
       fetch(`/api/sanitario${params}`),
       fetch("/api/bovinos"),
       fetch("/api/veterinarios"),
+      fetch("/api/estoque"),
     ]);
-    setRegistros(await regRes.json());
-    setBovinos(await bovRes.json());
-    const vets = await vetRes.json();
-    setVeterinarios(vets.filter((v: any) => v.ativo));
+    if (regRes.ok) setRegistros(await regRes.json());
+    if (bovRes.ok) setBovinos(await bovRes.json());
+    if (vetRes.ok) setVeterinarios((await vetRes.json()).filter((v: any) => v.ativo));
+    if (insRes.ok) setInsumos(await insRes.json());
     setLoading(false);
   };
 
@@ -75,9 +80,14 @@ export default function SanitarioPage() {
     await fetch("/api/sanitario", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, diasCarencia: parseInt(form.diasCarencia) }),
+      body: JSON.stringify({
+        ...form,
+        diasCarencia: parseInt(form.diasCarencia) || 0,
+        insumoId: form.insumoId || undefined,
+      }),
     });
     setShowForm(false);
+    setForm({ data: new Date().toISOString().split("T")[0], tipo: "VACINA", produto: "", dose: "", responsavel: "", diasCarencia: "0", observacoes: "", bovinoId: "", veterinarioId: "", insumoId: "" });
     setSaving(false);
     fetchData();
   };
@@ -102,6 +112,19 @@ export default function SanitarioPage() {
         <div className="flex gap-2">
           <Button variant={filtroCarencia ? "default" : "outline"} size="sm" onClick={() => setFiltroCarencia(!filtroCarencia)}>
             <AlertTriangle className="h-4 w-4" /> Em Carência
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => exportToCSV(registros, [
+            { header: "Data", accessor: (r) => formatDate(r.data) },
+            { header: "Brinco", accessor: (r) => r.bovino.brinco },
+            { header: "Nome", accessor: (r) => r.bovino.nome },
+            { header: "Tipo", accessor: (r) => tipoLabels[r.tipo] || r.tipo },
+            { header: "Produto", accessor: (r) => r.produto },
+            { header: "Dose", accessor: (r) => r.dose },
+            { header: "Carência (dias)", accessor: (r) => r.diasCarencia },
+            { header: "Fim Carência", accessor: (r) => r.fimCarencia ? formatDate(r.fimCarencia) : null },
+            { header: "Responsável", accessor: (r) => r.veterinario?.nome || r.responsavel },
+          ], `sanitario_${new Date().toISOString().split("T")[0]}`)} title="Exportar CSV">
+            <Download className="h-4 w-4" />
           </Button>
           <Button onClick={() => setShowForm(!showForm)} id="add-sanitario-btn">
             <Plus className="h-4 w-4" /> Novo Registro
@@ -138,8 +161,27 @@ export default function SanitarioPage() {
                     <option value="TRATAMENTO">Tratamento</option>
                   </select>
                 </div>
+                <div className="space-y-2">
+                  <Label>Descontar do Estoque?</Label>
+                  <select 
+                    value={form.insumoId} 
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      const insumo = insumos.find(i => i.id === id);
+                      if (insumo) {
+                        setForm({ ...form, insumoId: id, produto: insumo.nome });
+                      } else {
+                        setForm({ ...form, insumoId: "" });
+                      }
+                    }} 
+                    className="flex h-10 w-full rounded-lg border border-gray-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+                  >
+                    <option value="">(Não descontar - Produto Avulso)</option>
+                    {insumos.map(i => <option key={i.id} value={i.id} disabled={i.quantidade <= 0}>{i.nome} ({i.quantidade} {i.unidade})</option>)}
+                  </select>
+                </div>
                 <div className="space-y-2"><Label>Produto *</Label><Input value={form.produto} onChange={(e) => setForm({ ...form, produto: e.target.value })} placeholder="Nome do medicamento/vacina" required /></div>
-                <div className="space-y-2"><Label>Dose</Label><Input value={form.dose} onChange={(e) => setForm({ ...form, dose: e.target.value })} placeholder="Ex: 5ml" /></div>
+                <div className="space-y-2"><Label>Dose {form.insumoId ? `(em ${insumos.find(i => i.id === form.insumoId)?.unidade})` : ""}</Label><Input value={form.dose} onChange={(e) => setForm({ ...form, dose: e.target.value })} placeholder="Ex: 5" required={!!form.insumoId} /></div>
                 <div className="space-y-2"><Label>Dias de Carência</Label><Input type="number" min="0" value={form.diasCarencia} onChange={(e) => setForm({ ...form, diasCarencia: e.target.value })} /></div>
                 <div className="space-y-2">
                   <Label>Veterinário Cadastrado</Label>
@@ -168,19 +210,30 @@ export default function SanitarioPage() {
         </Card>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
         <table className="data-table">
-          <thead><tr><th>Data</th><th>Animal</th><th>Tipo</th><th>Produto</th><th>Dose</th><th>Carência</th><th>Responsável</th></tr></thead>
+          <thead><tr>
+            <th>Data</th>
+            <th>Animal</th>
+            <th>Tipo</th>
+            <th>Produto</th>
+            <th className="hidden md:table-cell">Dose</th>
+            <th>Carência</th>
+            <th className="hidden sm:table-cell">Responsável</th>
+          </tr></thead>
           <tbody>
             {registros.length === 0 ? (
               <tr><td colSpan={7} className="text-center py-8 text-gray-400">Nenhum registro sanitário</td></tr>
             ) : registros.map((r) => (
               <tr key={r.id}>
                 <td>{formatDate(r.data)}</td>
-                <td className="font-medium">{r.bovino.brinco} — {r.bovino.nome || ""}</td>
+                <td className="font-medium">{r.bovino.brinco}{r.bovino.nome ? ` — ${r.bovino.nome}` : ""}</td>
                 <td><Badge variant="secondary">{tipoLabels[r.tipo] || r.tipo}</Badge></td>
-                <td>{r.produto}</td>
-                <td>{r.dose || "—"}</td>
+                <td>
+                  {r.produto}
+                  {r.insumo && <Badge variant="outline" className="ml-2 text-[10px] uppercase bg-orange-50 text-orange-700 border-orange-200" title="Descontado do Estoque">Estoque</Badge>}
+                </td>
+                <td className="hidden md:table-cell text-gray-500">{r.dose || "—"}</td>
                 <td>
                   {r.diasCarencia > 0 ? (
                     estaEmCarencia(r.fimCarencia) ? (
@@ -190,7 +243,7 @@ export default function SanitarioPage() {
                     )
                   ) : "—"}
                 </td>
-                <td>
+                <td className="hidden sm:table-cell">
                    {r.veterinario ? (
                      <span className="font-medium text-emerald-700">{r.veterinario.nome}</span>
                    ) : (

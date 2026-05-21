@@ -11,7 +11,9 @@ import {
   Mail,
   BadgeAlert,
   BadgeCheck,
+  Eye,
 } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/hint";
 import { Input } from "@/components/ui/input";
@@ -274,17 +276,24 @@ export default function VeterinariosPage() {
                       <Stethoscope className="h-5 w-5" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900 flex items-center gap-1">
+                      <Link href={`/veterinarios/${vet.id}`} className="font-semibold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1">
                          {vet.nome}
                          {!vet.ativo && <span title="Inativo"><BadgeAlert className="h-4 w-4 text-red-500" /></span>}
                          {vet.ativo && <span title="Ativo"><BadgeCheck className="h-4 w-4 text-emerald-500" /></span>}
-                      </h3>
+                      </Link>
                       {vet.especialidade && (
                         <p className="text-xs text-gray-500 line-clamp-1">{vet.especialidade}</p>
                       )}
                     </div>
                   </div>
                   <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <Link
+                      href={`/veterinarios/${vet.id}`}
+                      className="rounded-md p-1.5 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600"
+                      title="Ver Ficha e Histórico"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Link>
                     <button
                       onClick={() => handleEdit(vet)}
                       className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"

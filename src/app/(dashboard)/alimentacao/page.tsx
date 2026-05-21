@@ -240,7 +240,7 @@ export default function AlimentacaoPage() {
         </Card>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
         <table className="data-table">
           <thead>
             <tr>

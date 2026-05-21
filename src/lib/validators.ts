@@ -124,6 +124,7 @@ export const registroSanitarioSchema = z.object({
   observacoes: z.string().optional(),
   bovinoId: z.string().min(1, "Bovino é obrigatório"),
   veterinarioId: z.string().optional(),
+  insumoId: z.string().optional(),
 });
 
 export type RegistroSanitarioInput = z.infer<typeof registroSanitarioSchema>;

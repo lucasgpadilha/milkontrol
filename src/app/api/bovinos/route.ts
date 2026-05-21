@@ -19,6 +19,13 @@ export async function GET(req: NextRequest) {
     deletedAt: null,
   };
 
+  const categoria = searchParams.get("categoria");
+  if (categoria === "bezerros") {
+    const umAnoAtras = new Date();
+    umAnoAtras.setFullYear(umAnoAtras.getFullYear() - 1);
+    where.dataNascimento = { gte: umAnoAtras };
+  }
+
   if (sexo) where.sexo = sexo;
   if (situacao) where.situacao = situacao;
   if (busca) {

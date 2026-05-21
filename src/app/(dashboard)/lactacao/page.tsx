@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, FlaskConical, Loader2 } from "lucide-react";
+import { Plus, FlaskConical, Loader2, Droplets } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Hint } from "@/components/hint";
@@ -67,9 +68,13 @@ export default function LactacaoPage() {
         <div className="flex gap-2">
           <Button variant={filtroAtivas ? "default" : "outline"} size="sm" onClick={() => setFiltroAtivas(true)}>Ativas</Button>
           <Button variant={!filtroAtivas ? "default" : "outline"} size="sm" onClick={() => setFiltroAtivas(false)}>Todas</Button>
+          <Link href="/lactacao/seca-lote">
+            <Button variant="outline" className="border-amber-200 text-amber-700 hover:bg-amber-50">
+              <Droplets className="h-4 w-4 mr-2" /> Secar (Em Lote)
+            </Button>
+          </Link>
           <Button onClick={() => setShowForm(!showForm)} id="add-lactacao-btn">
-
-            <Plus className="h-4 w-4" /> Iniciar Lactação
+            <Plus className="h-4 w-4 mr-2" /> Iniciar Lactação
           </Button>
         </div>
       </div>
@@ -110,21 +115,29 @@ export default function LactacaoPage() {
         </Card>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
         <table className="data-table">
-          <thead><tr><th>Vaca</th><th>Raça</th><th>Início</th><th>Fim</th><th>DEL</th><th>Status</th><th>Fazenda</th></tr></thead>
+          <thead><tr>
+            <th>Vaca</th>
+            <th className="hidden sm:table-cell">Raça</th>
+            <th>Início</th>
+            <th className="hidden md:table-cell">Fim</th>
+            <th>DEL</th>
+            <th>Status</th>
+            <th className="hidden lg:table-cell">Fazenda</th>
+          </tr></thead>
           <tbody>
             {lactacoes.length === 0 ? (
               <tr><td colSpan={7} className="text-center py-8 text-gray-400">Nenhuma lactação registrada</td></tr>
             ) : lactacoes.map((l) => (
               <tr key={l.id}>
-                <td className="font-medium">{l.bovino.brinco} — {l.bovino.nome || ""}</td>
-                <td>{l.bovino.raca}</td>
+                <td className="font-medium">{l.bovino.brinco}{l.bovino.nome ? ` — ${l.bovino.nome}` : ""}</td>
+                <td className="hidden sm:table-cell">{l.bovino.raca}</td>
                 <td>{formatDate(l.inicio)}</td>
-                <td>{l.fim ? formatDate(l.fim) : "—"}</td>
+                <td className="hidden md:table-cell">{l.fim ? formatDate(l.fim) : "—"}</td>
                 <td className="font-semibold text-emerald-600">{!l.fim ? `${calcularDEL(l.inicio)} dias` : "—"}</td>
                 <td><Badge variant={!l.fim ? "success" : "secondary"}>{!l.fim ? "Em Lactação" : "Encerrada"}</Badge></td>
-                <td className="text-gray-500">{l.bovino.fazenda.nome}</td>
+                <td className="hidden lg:table-cell text-gray-500">{l.bovino.fazenda.nome}</td>
               </tr>
             ))}
           </tbody>

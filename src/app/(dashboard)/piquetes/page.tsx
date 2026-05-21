@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Plus,
   Pencil,
@@ -8,7 +9,10 @@ import {
   Loader2,
   Fence,
   Beef,
+  ChevronRight,
+  ArrowRight,
 } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/hint";
 import { Input } from "@/components/ui/input";
@@ -41,6 +45,7 @@ const cores = [
 ];
 
 export default function PiquetesPage() {
+  const router = useRouter();
   const [piquetes, setPiquetes] = useState<Piquete[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -120,18 +125,28 @@ export default function PiquetesPage() {
             {fazendaAtiva && ` em ${fazendaAtiva.nome}`}
           </p>
         </div>
-        <Button
-          onClick={() => {
-            resetForm();
-            setShowForm(true);
-          }}
-          disabled={todasSelecionadas}
-          title={todasSelecionadas ? "Selecione uma fazenda para criar piquetes" : ""}
-          id="add-piquete-btn"
-        >
-          <Plus className="h-4 w-4" />
-          Novo Piquete
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => router.push("/piquetes/transferir")}
+            disabled={todasSelecionadas}
+            id="transfer-piquete-btn"
+          >
+            <ArrowRight className="h-4 w-4" /> Transferir
+          </Button>
+          <Button
+            onClick={() => {
+              resetForm();
+              setShowForm(true);
+            }}
+            disabled={todasSelecionadas}
+            title={todasSelecionadas ? "Selecione uma fazenda para criar piquetes" : ""}
+            id="add-piquete-btn"
+          >
+            <Plus className="h-4 w-4" />
+            Novo Piquete
+          </Button>
+        </div>
       </div>
 
       <Hint id="piquetes-intro" title="Organize seu rebanho por áreas">
@@ -215,27 +230,27 @@ export default function PiquetesPage() {
               <div className={`h-1.5 bg-gradient-to-r ${cores[i % cores.length]}`} />
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br ${cores[i % cores.length]} text-white shadow-sm`}>
+                  <Link href={`/piquetes/${piquete.id}`} className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br ${cores[i % cores.length]} text-white shadow-sm shrink-0`}>
                       <Fence className="h-5 w-5" />
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">{piquete.nome}</h3>
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-gray-900 group-hover:text-emerald-700 transition-colors">{piquete.nome}</h3>
                       {piquete.descricao && (
                         <p className="text-xs text-gray-500 line-clamp-1">{piquete.descricao}</p>
                       )}
                     </div>
-                  </div>
-                  <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  </Link>
+                  <div className="flex gap-1 ml-2 shrink-0">
                     <button
-                      onClick={() => handleEdit(piquete)}
+                      onClick={(e) => { e.preventDefault(); handleEdit(piquete); }}
                       className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
                       title="Editar"
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
-                      onClick={() => handleDelete(piquete.id)}
+                      onClick={(e) => { e.preventDefault(); handleDelete(piquete.id); }}
                       className="rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
                       title="Excluir"
                     >
@@ -243,11 +258,14 @@ export default function PiquetesPage() {
                     </button>
                   </div>
                 </div>
-                <div className="mt-4 flex items-center gap-2">
+                <div className="mt-4 flex items-center justify-between">
                   <Badge variant={piquete._count.bovinos > 0 ? "default" : "secondary"}>
                     <Beef className="mr-1 h-3 w-3" />
                     {piquete._count.bovinos} bovino{piquete._count.bovinos !== 1 ? "s" : ""}
                   </Badge>
+                  <Link href={`/piquetes/${piquete.id}`} className="flex items-center gap-1 text-xs text-gray-400 hover:text-emerald-600 transition-colors">
+                    Ver detalhes <ChevronRight className="h-3.5 w-3.5" />
+                  </Link>
                 </div>
               </CardContent>
             </Card>

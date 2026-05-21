@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Milk, Loader2, Layers, User, Save, Search } from "lucide-react";
+import { Plus, Milk, Loader2, Layers, User, Save, Search, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { fetchWithOfflineFallback } from "@/lib/offline-queue";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { formatDate, formatNumber } from "@/lib/utils";
 import { useFazendaAtiva } from "@/components/fazenda-context";
+import { exportToCSV } from "@/lib/csv-export";
 
 interface Producao {
   id: string;
@@ -152,9 +153,20 @@ export default function ProducaoPage() {
             {" · "}{bovinos.length} vaca(s) em lactação
           </p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)} id="add-producao-btn">
-          <Plus className="h-4 w-4" /> Novo Lançamento
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => exportToCSV(producoes, [
+            { header: "Data", accessor: (p) => formatDate(p.data) },
+            { header: "Brinco", accessor: (p) => p.bovino.brinco },
+            { header: "Nome", accessor: (p) => p.bovino.nome },
+            { header: "Quantidade (L)", accessor: (p) => p.quantidade },
+            { header: "Turno", accessor: (p) => p.turno },
+          ], `producao_${new Date().toISOString().split("T")[0]}`)} title="Exportar CSV">
+            <Download className="h-4 w-4" />
+          </Button>
+          <Button onClick={() => setShowForm(!showForm)} id="add-producao-btn">
+            <Plus className="h-4 w-4" /> Novo Lançamento
+          </Button>
+        </div>
       </div>
 
       <Hint id="producao-intro-v2" title="Lançamento de Ordenha — Individual ou em Lote">
