@@ -101,6 +101,37 @@ export interface ProjecaoFinanceira {
   projetado: number | null;
 }
 
+export interface ConfiguracaoAlertasInput {
+  quedaProducaoPct: number;
+  delSecagemAviso: number;
+  delSecagemCritico: number;
+  diasPrenhezPendente: number;
+  diasCarenciaVencendo: number;
+  diasSecaRetorno: number;
+}
+
+export interface PrevisaoProducaoAnimal {
+  animalId: string;
+  brinco: string;
+  nome: string | null;
+  mediaDiaria7: number;
+  mediaDiaria30: number;
+  mediaSemanal: number;
+  mediaMensal: number;
+  previsaoProximos7Dias: number;
+  previsaoProximos30Dias: number;
+  tendenciaPct: number | null;
+  comparativoRealVsPrevistoPct: number | null;
+  amostras: number;
+}
+
+export interface PrevisaoProducaoFazenda {
+  mediaDiariaRebanho: number;
+  totalProximos7Dias: number;
+  totalProximos30Dias: number;
+  animais: PrevisaoProducaoAnimal[];
+}
+
 // ─── Constantes ──────────────────────────────────────────────────────
 
 // Parâmetros default da Curva de Wood (Girolando/Holandês)
@@ -113,6 +144,15 @@ const PESOS_SCORE = {
   fertilidade: 0.25,
   custoBeneficio: 0.25,
   saude: 0.15,
+};
+
+export const CONFIG_ALERTAS_PADRAO: ConfiguracaoAlertasInput = {
+  quedaProducaoPct: 30,
+  delSecagemAviso: 240,
+  delSecagemCritico: 280,
+  diasPrenhezPendente: 45,
+  diasCarenciaVencendo: 3,
+  diasSecaRetorno: 90,
 };
 
 // ─── Utilitários ─────────────────────────────────────────────────────
@@ -133,6 +173,33 @@ function mediaPonderadaExponencial(valores: number[]): number {
     somaP += peso;
   });
   return somaP > 0 ? somaV / somaP : 0;
+}
+
+function arredondar(valor: number, casas = 2): number {
+  return Number(valor.toFixed(casas));
+}
+
+function mediaPorDia(
+  producoes: { data: string; quantidade: number }[],
+  inicio: Date,
+  fim: Date
+): { media: number; total: number; dias: number } {
+  const porDia = new Map<string, number>();
+
+  for (const p of producoes) {
+    const data = new Date(p.data);
+    if (data < inicio || data > fim) continue;
+    const chave = p.data.split("T")[0];
+    porDia.set(chave, (porDia.get(chave) || 0) + p.quantidade);
+  }
+
+  const total = [...porDia.values()].reduce((s, v) => s + v, 0);
+  const dias = porDia.size;
+  return {
+    media: dias > 0 ? total / dias : 0,
+    total,
+    dias,
+  };
 }
 
 // ─── Curva de Wood ───────────────────────────────────────────────────
@@ -231,7 +298,6 @@ export function calcularScoreEficiencia(
 
   // Penalizar por tratamentos nos últimos 60 dias
   const tratamentos60 = animal.registrosSanitarios.filter((r) => {
-    const dataR = new Date(r.data);
     const diff = diffDias(r.data, agora.toISOString());
     return diff <= 60 && (r.tipo === "MEDICAMENTO" || r.tipo === "TRATAMENTO");
   });
@@ -288,23 +354,27 @@ export function calcularScoreEficiencia(
 
 // ─── Alertas Preditivos ──────────────────────────────────────────────
 
-export function gerarAlertasPreditivos(animais: DadosAnimal[]): AlertaPreditivo[] {
+export function gerarAlertasPreditivos(
+  animais: DadosAnimal[],
+  config: ConfiguracaoAlertasInput = CONFIG_ALERTAS_PADRAO
+): AlertaPreditivo[] {
   const alertas: AlertaPreditivo[] = [];
   const agora = new Date();
+  const quedaLimite = Math.max(0, Math.min(100, config.quedaProducaoPct)) / 100;
 
   for (const a of animais) {
     if (a.sexo !== "FEMEA" || a.situacao !== "ATIVA") continue;
 
-    // 1. Secagem iminente (DEL > 240)
+    // 1. Secagem iminente
     const lactAtiva = a.lactacoes.find((l) => l.fim === null);
     if (lactAtiva) {
       const del = diffDias(lactAtiva.inicio, agora.toISOString());
-      if (del > 240) {
+      if (del > config.delSecagemAviso) {
         alertas.push({
           tipo: "SECAGEM",
-          severidade: del > 280 ? "critical" : "warning",
+          severidade: del > config.delSecagemCritico ? "critical" : "warning",
           titulo: `Secagem urgente: ${a.brinco}`,
-          descricao: `DEL ${del} — ultrapassou 240 dias. Programar secagem imediata para descanso pré-parto.`,
+          descricao: `DEL ${del} — ultrapassou ${config.delSecagemAviso} dias. Programar secagem imediata para descanso pré-parto.`,
           animalId: a.id,
           animalBrinco: a.brinco,
           animalNome: a.nome,
@@ -319,7 +389,7 @@ export function gerarAlertasPreditivos(animais: DadosAnimal[]): AlertaPreditivo[
       if (prods.length >= 14) {
         const ultimos7 = prods.slice(0, 7).reduce((s, p) => s + p.quantidade, 0) / 7;
         const anteriores7 = prods.slice(7, 14).reduce((s, p) => s + p.quantidade, 0) / 7;
-        if (anteriores7 > 0 && ultimos7 < anteriores7 * 0.7) {
+        if (anteriores7 > 0 && ultimos7 < anteriores7 * (1 - quedaLimite)) {
           alertas.push({
             tipo: "QUEDA_PRODUCAO",
             severidade: "warning",
@@ -336,7 +406,7 @@ export function gerarAlertasPreditivos(animais: DadosAnimal[]): AlertaPreditivo[
       const ultimaLact = a.lactacoes.length > 0 ? a.lactacoes[0] : null;
       if (ultimaLact?.fim) {
         const diasSeca = diffDias(ultimaLact.fim, agora.toISOString());
-        if (diasSeca > 90) {
+        if (diasSeca > config.diasSecaRetorno) {
           alertas.push({
             tipo: "RETORNO_POS_PARTO",
             severidade: "info",
@@ -354,7 +424,7 @@ export function gerarAlertasPreditivos(animais: DadosAnimal[]): AlertaPreditivo[
     for (const rs of a.registrosSanitarios) {
       if (rs.fimCarencia) {
         const diasRestantes = diffDias(agora.toISOString(), rs.fimCarencia);
-        if (diasRestantes > 0 && diasRestantes <= 3) {
+        if (diasRestantes > 0 && diasRestantes <= config.diasCarenciaVencendo) {
           alertas.push({
             tipo: "CARENCIA_VENCENDO",
             severidade: "info",
@@ -373,7 +443,7 @@ export function gerarAlertasPreditivos(animais: DadosAnimal[]): AlertaPreditivo[
     const insAberta = a.inseminacoes.find((i) => i.prenhez === null);
     if (insAberta) {
       const diasPendente = diffDias(insAberta.data, agora.toISOString());
-      if (diasPendente > 45) {
+      if (diasPendente > config.diasPrenhezPendente) {
         alertas.push({
           tipo: "PRENHEZ_PENDENTE",
           severidade: "warning",
@@ -392,6 +462,76 @@ export function gerarAlertasPreditivos(animais: DadosAnimal[]): AlertaPreditivo[
   alertas.sort((a, b) => ordemSeveridade[a.severidade] - ordemSeveridade[b.severidade]);
 
   return alertas;
+}
+
+// ─── Previsão de Produção ───────────────────────────────────────────
+
+export function calcularPrevisaoProducao(
+  animais: DadosAnimal[]
+): PrevisaoProducaoFazenda {
+  const agora = new Date();
+  const fim = new Date(agora);
+  const inicio7 = new Date(agora);
+  inicio7.setDate(inicio7.getDate() - 7);
+  const inicio14 = new Date(agora);
+  inicio14.setDate(inicio14.getDate() - 14);
+  const inicio30 = new Date(agora);
+  inicio30.setDate(inicio30.getDate() - 30);
+
+  const previsoes = animais
+    .filter((a) => a.sexo === "FEMEA" && a.situacao === "ATIVA")
+    .map((a) => {
+      const p7 = mediaPorDia(a.producoes, inicio7, fim);
+      const p7Anterior = mediaPorDia(a.producoes, inicio14, inicio7);
+      const p30 = mediaPorDia(a.producoes, inicio30, fim);
+      const amostras = new Set(a.producoes.map((p) => p.data.split("T")[0])).size;
+
+      const bases = [p7.media, p30.media, p7Anterior.media].filter((v) => v > 0);
+      const previsaoDia =
+        bases.length === 0
+          ? 0
+          : p7.media > 0 && p30.media > 0
+          ? p7.media * 0.6 + p30.media * 0.3 + (p7Anterior.media || p30.media) * 0.1
+          : mediaPonderadaExponencial(bases);
+
+      const tendenciaPct =
+        p7Anterior.media > 0
+          ? ((p7.media - p7Anterior.media) / p7Anterior.media) * 100
+          : null;
+      const comparativo =
+        p7Anterior.media > 0
+          ? ((p7.media - p7Anterior.media) / p7Anterior.media) * 100
+          : null;
+
+      return {
+        animalId: a.id,
+        brinco: a.brinco,
+        nome: a.nome,
+        mediaDiaria7: arredondar(p7.media),
+        mediaDiaria30: arredondar(p30.media),
+        mediaSemanal: arredondar(p7.media * 7),
+        mediaMensal: arredondar(p30.media * 30),
+        previsaoProximos7Dias: arredondar(previsaoDia * 7),
+        previsaoProximos30Dias: arredondar(previsaoDia * 30),
+        tendenciaPct: tendenciaPct === null ? null : arredondar(tendenciaPct, 1),
+        comparativoRealVsPrevistoPct:
+          comparativo === null ? null : arredondar(comparativo, 1),
+        amostras,
+      };
+    })
+    .sort((a, b) => b.previsaoProximos30Dias - a.previsaoProximos30Dias);
+
+  const totalProximos7Dias = previsoes.reduce((s, p) => s + p.previsaoProximos7Dias, 0);
+  const totalProximos30Dias = previsoes.reduce((s, p) => s + p.previsaoProximos30Dias, 0);
+  const animaisComPrevisao = previsoes.filter((p) => p.previsaoProximos30Dias > 0).length;
+
+  return {
+    mediaDiariaRebanho:
+      animaisComPrevisao > 0 ? arredondar(totalProximos30Dias / 30 / animaisComPrevisao) : 0,
+    totalProximos7Dias: arredondar(totalProximos7Dias),
+    totalProximos30Dias: arredondar(totalProximos30Dias),
+    animais: previsoes,
+  };
 }
 
 // ─── ROI por Animal ──────────────────────────────────────────────────

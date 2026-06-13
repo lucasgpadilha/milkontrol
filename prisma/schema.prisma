@@ -126,6 +126,25 @@ model Fazenda {
   usuariosAtivos User[]   @relation("FazendaAtiva")
   apiKeys        ApiKey[]
   convites       ConviteFazenda[]
+  configuracaoAlertas ConfiguracaoAlertas?
+}
+
+// ─── Configuração de Alertas ────────────────────────────────────────
+
+model ConfiguracaoAlertas {
+  id                   String   @id @default(cuid())
+  fazendaId            String   @unique
+  fazenda              Fazenda  @relation(fields: [fazendaId], references: [id], onDelete: Cascade)
+  quedaProducaoPct     Float    @default(30)
+  delSecagemAviso      Int      @default(240)
+  delSecagemCritico    Int      @default(280)
+  diasPrenhezPendente  Int      @default(45)
+  diasCarenciaVencendo Int      @default(3)
+  diasSecaRetorno      Int      @default(90)
+  criadoEm             DateTime @default(now())
+  atualizadoEm         DateTime @updatedAt
+
+  @@index([fazendaId])
 }
 
 // ─── API Keys ───────────────────────────────────────────────────────

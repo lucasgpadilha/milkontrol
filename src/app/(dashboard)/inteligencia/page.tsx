@@ -5,7 +5,6 @@ import {
   Loader2,
   Brain,
   TrendingUp,
-  TrendingDown,
   Activity,
   AlertTriangle,
   AlertCircle,
@@ -17,8 +16,8 @@ import {
   ChevronRight,
   X,
   Beef,
-  Syringe,
-  Scale,
+  Settings2,
+  Save,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -102,6 +101,7 @@ interface AnimalDetalhe {
   score: ScoreAnimal;
   curvaWood: CurvaWoodPonto[];
   roi: ROI;
+  previsao: PrevisaoAnimal | null;
   precoLitroBase: number;
 }
 
@@ -109,6 +109,37 @@ interface Projecao {
   rotulo: string;
   real: number | null;
   projetado: number | null;
+}
+
+interface ConfigAlertas {
+  quedaProducaoPct: number;
+  delSecagemAviso: number;
+  delSecagemCritico: number;
+  diasPrenhezPendente: number;
+  diasCarenciaVencendo: number;
+  diasSecaRetorno: number;
+}
+
+interface PrevisaoAnimal {
+  animalId: string;
+  brinco: string;
+  nome: string | null;
+  mediaDiaria7: number;
+  mediaDiaria30: number;
+  mediaSemanal: number;
+  mediaMensal: number;
+  previsaoProximos7Dias: number;
+  previsaoProximos30Dias: number;
+  tendenciaPct: number | null;
+  comparativoRealVsPrevistoPct: number | null;
+  amostras: number;
+}
+
+interface PrevisaoFazenda {
+  mediaDiariaRebanho: number;
+  totalProximos7Dias: number;
+  totalProximos30Dias: number;
+  animais: PrevisaoAnimal[];
 }
 
 // ─── Componentes Auxiliares ──────────────────────────────────────────
@@ -344,6 +375,62 @@ function AnimalDrawer({
               </CardContent>
             </Card>
 
+            {/* Previsão */}
+            {data.previsao && (
+              <Card className="border-gray-100 shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold text-gray-700">
+                    Previsão de Produção
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Baseada nas médias recentes do animal
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-blue-50 p-4 text-center">
+                      <p className="text-xs font-medium text-blue-700 uppercase">
+                        Próx. 7 dias
+                      </p>
+                      <p className="text-xl font-bold text-blue-900 mt-1">
+                        {formatNumber(data.previsao.previsaoProximos7Dias)}L
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-violet-50 p-4 text-center">
+                      <p className="text-xs font-medium text-violet-700 uppercase">
+                        Próx. 30 dias
+                      </p>
+                      <p className="text-xl font-bold text-violet-900 mt-1">
+                        {formatNumber(data.previsao.previsaoProximos30Dias)}L
+                      </p>
+                    </div>
+                    <div className="col-span-2 rounded-xl bg-gray-50 p-4">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500">Média 7d</span>
+                        <span className="font-semibold text-gray-900">
+                          {formatNumber(data.previsao.mediaDiaria7)} L/dia
+                        </span>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between text-sm">
+                        <span className="text-gray-500">Tendência</span>
+                        <span
+                          className={`font-semibold ${
+                            (data.previsao.tendenciaPct || 0) >= 0
+                              ? "text-emerald-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {data.previsao.tendenciaPct === null
+                            ? "Sem histórico"
+                            : `${data.previsao.tendenciaPct > 0 ? "+" : ""}${formatNumber(data.previsao.tendenciaPct)}%`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Curva de Wood */}
             {data.curvaWood.length > 0 && (
               <Card className="border-gray-100 shadow-sm">
@@ -440,16 +527,22 @@ export default function InteligenciaPage() {
   const [ranking, setRanking] = useState<ScoreAnimal[]>([]);
   const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [projecao, setProjecao] = useState<Projecao[]>([]);
+  const [previsao, setPrevisao] = useState<PrevisaoFazenda | null>(null);
+  const [configDraft, setConfigDraft] = useState<ConfigAlertas | null>(null);
+  const [configMessage, setConfigMessage] = useState<string | null>(null);
+  const [savingConfig, setSavingConfig] = useState(false);
   const [precoBase, setPrecoBase] = useState(0);
   const [drawerAnimalId, setDrawerAnimalId] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [resRebanho, resRanking, resProjecao] = await Promise.all([
+      const [resRebanho, resRanking, resProjecao, resPrevisao, resConfig] = await Promise.all([
         fetch("/api/inteligencia?tipo=rebanho").then((r) => r.json()),
         fetch("/api/inteligencia?tipo=ranking").then((r) => r.json()),
         fetch("/api/inteligencia?tipo=projecao").then((r) => r.json()),
+        fetch("/api/inteligencia?tipo=previsao").then((r) => r.json()),
+        fetch("/api/alertas-config").then((r) => r.json()),
       ]);
 
       if (resRebanho.kpis) setKpis(resRebanho.kpis);
@@ -457,6 +550,13 @@ export default function InteligenciaPage() {
       if (resRanking.ranking) setRanking(resRanking.ranking);
       if (resRanking.alertas) setAlertas(resRanking.alertas);
       if (resProjecao.projecao) setProjecao(resProjecao.projecao);
+      if (resPrevisao.previsao) setPrevisao(resPrevisao.previsao);
+      if (resConfig.config) {
+        setConfigDraft(resConfig.config);
+        setConfigMessage(null);
+      } else if (resConfig.error) {
+        setConfigMessage(resConfig.error);
+      }
     } catch (e) {
       console.error("Erro ao carregar inteligência:", e);
     } finally {
@@ -467,6 +567,39 @@ export default function InteligenciaPage() {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  const updateConfigDraft = (field: keyof ConfigAlertas, value: number) => {
+    setConfigDraft((current) => current ? { ...current, [field]: value } : current);
+  };
+
+  const saveConfig = async () => {
+    if (!configDraft) return;
+    setSavingConfig(true);
+    setConfigMessage(null);
+
+    try {
+      const res = await fetch("/api/alertas-config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(configDraft),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setConfigMessage(data.error || "Não foi possível salvar a configuração");
+        return;
+      }
+
+      setConfigDraft(data.config);
+      setConfigMessage("Configuração salva");
+      await fetchAll();
+    } catch (e) {
+      console.error("Erro ao salvar configuração de alertas:", e);
+      setConfigMessage("Erro ao salvar configuração");
+    } finally {
+      setSavingConfig(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -549,6 +682,216 @@ export default function InteligenciaPage() {
           />
         </div>
       )}
+
+      {/* Previsão de Produção + Configuração */}
+      <div className="grid gap-6 lg:grid-cols-5">
+        <Card className="shadow-sm border-gray-100 lg:col-span-3">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-emerald-500" />
+                  Previsão de Produção
+                </CardTitle>
+                <CardDescription className="text-xs mt-1">
+                  Projeção por vaca e consolidado da fazenda
+                </CardDescription>
+              </div>
+              <Badge variant="secondary" className="text-xs whitespace-nowrap">
+                {previsao?.animais.filter((a) => a.previsaoProximos30Dias > 0).length || 0} com dados
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {!previsao ? (
+              <div className="py-10 text-center text-gray-400">
+                <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Sem dados de produção para prever.</p>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-lg bg-emerald-50 p-4">
+                    <p className="text-xs font-medium uppercase text-emerald-700">
+                      Próx. 7 dias
+                    </p>
+                    <p className="mt-1 text-2xl font-bold text-emerald-900">
+                      {formatNumber(previsao.totalProximos7Dias)}L
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-blue-50 p-4">
+                    <p className="text-xs font-medium uppercase text-blue-700">
+                      Próx. 30 dias
+                    </p>
+                    <p className="mt-1 text-2xl font-bold text-blue-900">
+                      {formatNumber(previsao.totalProximos30Dias)}L
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 p-4">
+                    <p className="text-xs font-medium uppercase text-gray-600">
+                      Média prevista
+                    </p>
+                    <p className="mt-1 text-2xl font-bold text-gray-900">
+                      {formatNumber(previsao.mediaDiariaRebanho)}L/dia
+                    </p>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-xs uppercase tracking-wider text-gray-500">
+                        <th className="py-2 pr-3 text-left font-medium">Animal</th>
+                        <th className="py-2 pr-3 text-left font-medium">7d</th>
+                        <th className="py-2 pr-3 text-left font-medium">30d</th>
+                        <th className="py-2 pr-3 text-left font-medium">Tend.</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {previsao.animais.slice(0, 6).map((animal) => (
+                        <tr key={animal.animalId}>
+                          <td className="py-2.5 pr-3">
+                            <span className="font-semibold text-gray-900">{animal.brinco}</span>
+                            {animal.nome && (
+                              <span className="ml-1 text-gray-500">— {animal.nome}</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 pr-3 tabular-nums text-gray-700">
+                            {formatNumber(animal.previsaoProximos7Dias)}L
+                          </td>
+                          <td className="py-2.5 pr-3 tabular-nums text-gray-700">
+                            {formatNumber(animal.previsaoProximos30Dias)}L
+                          </td>
+                          <td
+                            className={`py-2.5 pr-3 tabular-nums font-medium ${
+                              (animal.tendenciaPct || 0) >= 0
+                                ? "text-emerald-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            {animal.tendenciaPct === null
+                              ? "—"
+                              : `${animal.tendenciaPct > 0 ? "+" : ""}${formatNumber(animal.tendenciaPct)}%`}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-gray-100 lg:col-span-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
+              <Settings2 className="h-4 w-4 text-gray-500" />
+              Limites dos Alertas
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Parâmetros usados nos alertas inteligentes
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!configDraft ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                {configMessage || "Selecione uma fazenda ativa para ajustar os limites."}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="space-y-1">
+                    <span className="text-xs font-medium text-gray-600">Queda produção %</span>
+                    <input
+                      type="number"
+                      min={5}
+                      max={80}
+                      value={configDraft.quedaProducaoPct}
+                      onChange={(e) => updateConfigDraft("quedaProducaoPct", Number(e.target.value))}
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-xs font-medium text-gray-600">Prenhez pendente</span>
+                    <input
+                      type="number"
+                      min={15}
+                      max={120}
+                      value={configDraft.diasPrenhezPendente}
+                      onChange={(e) => updateConfigDraft("diasPrenhezPendente", Number(e.target.value))}
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-xs font-medium text-gray-600">DEL aviso</span>
+                    <input
+                      type="number"
+                      min={150}
+                      max={330}
+                      value={configDraft.delSecagemAviso}
+                      onChange={(e) => updateConfigDraft("delSecagemAviso", Number(e.target.value))}
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-xs font-medium text-gray-600">DEL crítico</span>
+                    <input
+                      type="number"
+                      min={180}
+                      max={360}
+                      value={configDraft.delSecagemCritico}
+                      onChange={(e) => updateConfigDraft("delSecagemCritico", Number(e.target.value))}
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-xs font-medium text-gray-600">Carência vence</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={30}
+                      value={configDraft.diasCarenciaVencendo}
+                      onChange={(e) => updateConfigDraft("diasCarenciaVencendo", Number(e.target.value))}
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-xs font-medium text-gray-600">Seca retorno</span>
+                    <input
+                      type="number"
+                      min={30}
+                      max={180}
+                      value={configDraft.diasSecaRetorno}
+                      onChange={(e) => updateConfigDraft("diasSecaRetorno", Number(e.target.value))}
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    />
+                  </label>
+                </div>
+
+                {configMessage && (
+                  <p className="text-xs text-gray-500">{configMessage}</p>
+                )}
+
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={saveConfig}
+                  disabled={savingConfig}
+                  className="w-full"
+                >
+                  {savingConfig ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="mr-2 h-4 w-4" />
+                  )}
+                  Salvar limites
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Projeção + Alertas */}
       <div className="grid gap-6 lg:grid-cols-5">

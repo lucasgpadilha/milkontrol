@@ -6,6 +6,8 @@ import {
   calcularKPIsRebanho,
   calcularCurvaWood,
   calcularROI,
+  calcularPrevisaoProducao,
+  CONFIG_ALERTAS_PADRAO,
   gerarAlertasPreditivos,
   projetarReceita,
   type DadosAnimal,
@@ -127,7 +129,6 @@ function calcularCustoAlimDiario(
 ): number {
   if (alimentacao.length === 0 || totalAnimais === 0) return 3.0; // fallback R$ 3/dia
   
-  const agora = new Date();
   const hojeMinus30 = new Date();
   hojeMinus30.setDate(hojeMinus30.getDate() - 30);
 
@@ -138,6 +139,27 @@ function calcularCustoAlimDiario(
   );
 
   return custoTotal30 > 0 ? custoTotal30 / totalAnimais / 30 : 3.0;
+}
+
+async function carregarConfiguracaoAlertas(
+  fazendaIds: string[],
+  todas: boolean
+) {
+  if (todas || fazendaIds.length !== 1) return CONFIG_ALERTAS_PADRAO;
+
+  const config = await prisma.configuracaoAlertas.findUnique({
+    where: { fazendaId: fazendaIds[0] },
+    select: {
+      quedaProducaoPct: true,
+      delSecagemAviso: true,
+      delSecagemCritico: true,
+      diasPrenhezPendente: true,
+      diasCarenciaVencendo: true,
+      diasSecaRetorno: true,
+    },
+  });
+
+  return config || CONFIG_ALERTAS_PADRAO;
 }
 
 // ─── Handler GET ─────────────────────────────────────────────────────
@@ -162,6 +184,7 @@ export async function GET(req: NextRequest) {
 
     const precoBase = calcularPrecoBase(vendas);
     const custoAlimDiario = calcularCustoAlimDiario(alimentacao, animais.length);
+    const configAlertas = await carregarConfiguracaoAlertas(ctx.fazendaIds, ctx.todas);
 
     // Média de produção do rebanho (últimos 30 dias)
     const hojeMinus30 = new Date();
@@ -198,13 +221,14 @@ export async function GET(req: NextRequest) {
           )
           .sort((a, b) => b.score - a.score);
 
-        const alertas = gerarAlertasPreditivos(animais);
+        const alertas = gerarAlertasPreditivos(animais, configAlertas);
 
         return NextResponse.json({
           tipo: "ranking",
           computadoEm: new Date().toISOString(),
           totalAnimais: animais.length,
           mediaRebanhoLDia: Number(mediaRebanho.toFixed(2)),
+          configAlertas,
           ranking: scores,
           alertas,
         });
@@ -254,7 +278,16 @@ export async function GET(req: NextRequest) {
           score,
           curvaWood,
           roi,
+          previsao: calcularPrevisaoProducao([animal]).animais[0] || null,
           precoLitroBase: precoBase,
+        });
+      }
+
+      case "previsao": {
+        return NextResponse.json({
+          tipo: "previsao",
+          computadoEm: new Date().toISOString(),
+          previsao: calcularPrevisaoProducao(animais),
         });
       }
 
@@ -273,7 +306,7 @@ export async function GET(req: NextRequest) {
 
       default:
         return NextResponse.json(
-          { error: `Tipo '${tipo}' não reconhecido. Use: rebanho, ranking, animal, projecao` },
+          { error: `Tipo '${tipo}' não reconhecido. Use: rebanho, ranking, animal, previsao, projecao` },
           { status: 400 }
         );
     }

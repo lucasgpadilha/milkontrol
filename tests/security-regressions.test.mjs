@@ -67,3 +67,29 @@ test("health endpoint exposes non-cached application and database status", () =>
   assert.match(source, /status:\s*"ok"/);
   assert.match(source, /status:\s*503/);
 });
+
+test("intelligence alerts are farm-configurable and forecast production is exposed", () => {
+  const schema = read("prisma/schema.prisma");
+  const migration = read("prisma/migrations/0002_alert_config/migration.sql");
+  const engine = read("src/lib/inteligencia-engine.ts");
+  const route = read("src/app/api/inteligencia/route.ts");
+  const configRoute = read("src/app/api/alertas-config/route.ts");
+
+  assert.match(schema, /model ConfiguracaoAlertas/);
+  assert.match(migration, /CREATE TABLE "ConfiguracaoAlertas"/);
+  assert.match(engine, /CONFIG_ALERTAS_PADRAO/);
+  assert.match(engine, /calcularPrevisaoProducao/);
+  assert.match(route, /tipo:\s*"previsao"/);
+  assert.match(route, /gerarAlertasPreditivos\(animais,\s*configAlertas\)/);
+  assert.match(configRoute, /assertRole\(\["PROPRIETARIO",\s*"GERENTE"\]\)/);
+  assert.match(configRoute, /Cache-Control":\s*"no-store"/);
+});
+
+test("production performance check enforces the 3 second MVP threshold", () => {
+  const packageJson = JSON.parse(read("package.json"));
+  const source = read("scripts/check-performance.mjs");
+
+  assert.equal(packageJson.scripts["check:performance"], "node scripts/check-performance.mjs");
+  assert.match(source, /PERFORMANCE_THRESHOLD_MS \|\| 3000/);
+  assert.match(source, /\/api\/health/);
+});

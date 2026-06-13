@@ -8,6 +8,7 @@
     "test": "node --test tests/*.test.mjs",
     "start": "next start --port 3005",
     "lint": "eslint",
+    "check:performance": "node scripts/check-performance.mjs",
     "db:migrate": "node scripts/deploy-migrations.mjs",
     "redeploy": "npm run db:migrate && npm run build && pm2 startOrReload ecosystem.config.js --update-env",
     "db:backup": "./scripts/backup.sh"
