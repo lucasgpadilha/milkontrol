@@ -23,8 +23,10 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
 
+  const ctx = await getFazendaAtivaIds();
+  if (!ctx) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+
   const body = await req.json();
-  const { fazendaId, ...rest } = body;
 
   // Check if it's a tank or a movimentação
   if (body.tanqueId) {
@@ -32,7 +34,9 @@ export async function POST(req: NextRequest) {
     const validation = movimentacaoTanqueSchema.safeParse(body);
     if (!validation.success) return NextResponse.json({ error: validation.error.issues[0].message }, { status: 400 });
 
-    const tanque = await prisma.tanque.findFirst({ where: { id: validation.data.tanqueId } });
+    const tanque = await prisma.tanque.findFirst({
+      where: { id: validation.data.tanqueId, fazendaId: { in: ctx.fazendaIds } },
+    });
     if (!tanque) return NextResponse.json({ error: "Tanque não encontrado" }, { status: 404 });
 
     const novoVolume = validation.data.tipo === "ENTRADA"
@@ -67,12 +71,16 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(movimentacao, { status: 201 });
   } else {
+    if (ctx.todas || !ctx.fazendaAtiva) {
+      return NextResponse.json({ error: "Selecione uma fazenda ativa para cadastrar tanque" }, { status: 400 });
+    }
+
     // It's a new tank
-    const validation = tanqueSchema.safeParse(rest);
+    const validation = tanqueSchema.safeParse(body);
     if (!validation.success) return NextResponse.json({ error: validation.error.issues[0].message }, { status: 400 });
 
     const tanque = await prisma.tanque.create({
-      data: { ...validation.data, fazendaId },
+      data: { ...validation.data, fazendaId: ctx.fazendaAtiva.id },
     });
 
     return NextResponse.json(tanque, { status: 201 });

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CloudOff, CloudSync, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
-import { getOfflineQueue, removeFromOfflineQueue, OfflineRequest, fetchWithOfflineFallback } from "@/lib/offline-queue";
+import { getOfflineQueue, removeFromOfflineQueue, OfflineRequest } from "@/lib/offline-queue";
 import { Button } from "@/components/ui/button";
 
 export function OfflineIndicator() {
@@ -11,10 +11,47 @@ export function OfflineIndicator() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   
-  const refreshQueue = async () => {
+  const refreshQueue = useCallback(async () => {
     const q = await getOfflineQueue();
     setQueue(q);
-  };
+  }, []);
+
+  const syncQueue = useCallback(async () => {
+    if (isSyncing || !navigator.onLine) return;
+
+    const currentQueue = await getOfflineQueue();
+    if (currentQueue.length === 0) return;
+
+    setIsSyncing(true);
+    let allSuccess = true;
+
+    for (const req of currentQueue) {
+      try {
+        const response = await fetch(req.url, {
+          method: req.method,
+          headers: { "Content-Type": "application/json" },
+          body: req.body ? JSON.stringify(req.body) : undefined,
+        });
+
+        if (response.ok || response.status === 400 || response.status === 403) {
+          // The server processed the request; remove business-rule failures from the retry queue.
+          await removeFromOfflineQueue(req.id);
+        } else {
+          allSuccess = false;
+        }
+      } catch {
+        allSuccess = false;
+      }
+    }
+
+    await refreshQueue();
+    setIsSyncing(false);
+    if (!allSuccess) {
+      console.error("Falha parcial na sincronização da fila offline");
+    } else {
+       setShowDropdown(false);
+    }
+  }, [isSyncing, refreshQueue]);
 
   useEffect(() => {
     // Initial check
@@ -40,45 +77,7 @@ export function OfflineIndicator() {
       window.removeEventListener("offline", handleOffline);
       window.removeEventListener("offline-queue-updated", handleQueueUpdate);
     };
-  }, []);
-
-  const syncQueue = async () => {
-    if (isSyncing || !navigator.onLine) return;
-    
-    const currentQueue = await getOfflineQueue();
-    if (currentQueue.length === 0) return;
-
-    setIsSyncing(true);
-    let allSuccess = true;
-
-    for (const req of currentQueue) {
-      try {
-        const response = await fetch(req.url, {
-          method: req.method,
-          headers: { "Content-Type": "application/json" },
-          body: req.body ? JSON.stringify(req.body) : undefined,
-        });
-        
-        if (response.ok || response.status === 400 || response.status === 403) {
-          // If true success or business logical error (which means it Reached the server), we remove it.
-          // In real prod, we might want to flag 400s to the user, but for now we consume the queue.
-          await removeFromOfflineQueue(req.id);
-        } else {
-          allSuccess = false;
-        }
-      } catch (err) {
-        allSuccess = false;
-      }
-    }
-
-    await refreshQueue();
-    setIsSyncing(false);
-    if (!allSuccess) {
-      console.error("Falha parcial na sincronização da fila offline");
-    } else {
-       setShowDropdown(false); // Hide if all done
-    }
-  };
+  }, [refreshQueue, syncQueue]);
 
   if (queue.length === 0 && isOnline) return null;
 

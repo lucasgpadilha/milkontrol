@@ -303,7 +303,6 @@ async function main() {
     for (let day = PAST_DAYS; day >= 0; day--) {
       const litragemTotal = sumDailyProd.get(day) || 0;
       if (litragemTotal > 0) {
-        let distribLitragem = litragemTotal;
         // Dividir a produção total entre os tanques como entrada
         for (const tId of tIds) {
           const quota = litragemTotal / tIds.length;

@@ -1,10 +1,10 @@
 const CACHE_NAME = 'milkontrol-v2';
 const STATIC_CACHE = 'milkontrol-static-v2';
-const API_CACHE = 'milkontrol-api-v1';
 
 // Assets to cache immediately on install
 const PRECACHE_URLS = [
   '/manifest.json',
+  '/offline.html',
   '/icon-192.png',
   '/icon-512.png',
 ];
@@ -25,7 +25,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.filter((name) => {
-          return name !== CACHE_NAME && name !== STATIC_CACHE && name !== API_CACHE;
+            return name !== CACHE_NAME && name !== STATIC_CACHE;
         }).map((name) => caches.delete(name))
       );
     })
@@ -44,24 +44,10 @@ self.addEventListener('fetch', (event) => {
   // Skip external requests
   if (url.origin !== self.location.origin) return;
 
-  // API requests: Network-first with short cache
+  // API requests contain tenant-scoped data. Never cache them in the service worker.
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          // Cache successful GET API responses for offline fallback
-          if (response.ok) {
-            const cloned = response.clone();
-            caches.open(API_CACHE).then((cache) => {
-              cache.put(request, cloned);
-            });
-          }
-          return response;
-        })
-        .catch(async () => {
-          // Offline: try to serve cached API response
-          const cached = await caches.match(request);
-          if (cached) return cached;
+      fetch(request).catch(() => {
           return new Response(JSON.stringify({ error: 'Sem conexão' }), {
             status: 503,
             headers: { 'Content-Type': 'application/json' },
@@ -93,23 +79,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Pages: Network-first with cache fallback
+  // Pages may include authenticated shells. Do not cache HTML navigations.
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
-        .then((response) => {
-          const cloned = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, cloned);
-          });
-          return response;
-        })
         .catch(async () => {
-          const cached = await caches.match(request);
-          if (cached) return cached;
-          // Try serving the main page as fallback
-          const mainPage = await caches.match('/');
-          if (mainPage) return mainPage;
+          const offline = await caches.match('/offline.html');
+          if (offline) return offline;
           return new Response('Sem conexão. Tente novamente quando estiver online.', {
             status: 503,
             headers: { 'Content-Type': 'text/html; charset=utf-8' },

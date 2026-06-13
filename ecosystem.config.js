@@ -4,7 +4,7 @@ module.exports = {
       name: "milkontrol",
       script: "node_modules/.bin/next",
       args: "start --port 3005",
-      cwd: "/home/opc/projects/milkontrol",
+      cwd: "/data/milkontrol",
       env: {
         NODE_ENV: "production",
       },

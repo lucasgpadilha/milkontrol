@@ -48,12 +48,23 @@ export async function DELETE(req: NextRequest) {
 
   if (type === "membro") {
     // Não pode remover a si mesmo por esta rota (previne lockout)
-    const target = await prisma.usuarioFazenda.findFirst({ where: { id } });
+    const target = await prisma.usuarioFazenda.findFirst({
+      where: { id, fazendaId: ctx.fazendaIds[0] },
+    });
+    if (!target) {
+      return NextResponse.json({ error: "Membro não encontrado nesta fazenda" }, { status: 404 });
+    }
     if (target?.userId === session.user.id) {
       return NextResponse.json({ error: "Use a opção de sair da fazenda" }, { status: 400 });
     }
     await prisma.usuarioFazenda.delete({ where: { id } });
   } else if (type === "convite") {
+    const convite = await prisma.conviteFazenda.findFirst({
+      where: { id, fazendaId: ctx.fazendaIds[0] },
+    });
+    if (!convite) {
+      return NextResponse.json({ error: "Convite não encontrado nesta fazenda" }, { status: 404 });
+    }
     await prisma.conviteFazenda.delete({ where: { id } });
   }
 

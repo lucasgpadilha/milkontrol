@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { getFazendaAtivaIds } from "@/lib/fazenda-ativa";
+import { assertRole } from "@/lib/rbac";
 
 const loteSchema = z.object({
   bovinoIds: z.array(z.string()).min(1, "Selecione pelo menos um animal"),
@@ -17,6 +19,12 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
 
+  const roleCheck = await assertRole(["PROPRIETARIO", "GERENTE", "VETERINARIO"]);
+  if (!roleCheck) return NextResponse.json({ error: "Sem permissão para esta operação" }, { status: 403 });
+
+  const ctx = await getFazendaAtivaIds();
+  if (!ctx || ctx.fazendaIds.length === 0) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+
   const body = await req.json();
   const validation = loteSchema.safeParse(body);
   if (!validation.success) {
@@ -27,9 +35,36 @@ export async function POST(req: NextRequest) {
   const quantidadeNecessaria = bovinoIds.length;
 
   try {
+    const bovinos = await prisma.bovino.findMany({
+      where: {
+        id: { in: bovinoIds },
+        fazendaId: { in: ctx.fazendaIds },
+        sexo: "FEMEA",
+        situacao: "ATIVA",
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+
+    if (bovinos.length !== bovinoIds.length) {
+      return NextResponse.json(
+        { error: "Um ou mais bovinos não pertencem à fazenda selecionada ou não estão aptos para reprodução" },
+        { status: 404 }
+      );
+    }
+
+    if (rest.veterinarioId) {
+      const veterinario = await prisma.veterinario.findFirst({
+        where: { id: rest.veterinarioId, fazendaId: { in: ctx.fazendaIds }, ativo: true },
+      });
+      if (!veterinario) {
+        return NextResponse.json({ error: "Veterinário não encontrado nesta fazenda" }, { status: 404 });
+      }
+    }
+
     if (bancoSemenId) {
-      const semen = await prisma.bancoSemen.findUnique({
-        where: { id: bancoSemenId },
+      const semen = await prisma.bancoSemen.findFirst({
+        where: { id: bancoSemenId, fazendaId: { in: ctx.fazendaIds } },
       });
       
       if (!semen) {
@@ -72,7 +107,8 @@ export async function POST(req: NextRequest) {
     await prisma.$transaction(operations);
 
     return NextResponse.json({ ok: true, count: quantidadeNecessaria }, { status: 201 });
-  } catch (error: any) {
-    return NextResponse.json({ error: "Ocorreu um erro no lançamento: " + error.message }, { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "erro desconhecido";
+    return NextResponse.json({ error: "Ocorreu um erro no lançamento: " + message }, { status: 500 });
   }
 }
